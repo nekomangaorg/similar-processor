@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/antihax/optional"
 	"github.com/similar-manga/similar/mangadex"
-	"io/ioutil"
+	"go.uber.org/ratelimit"
 	"log"
 	"math"
 	"net/http"
@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// This is a global variable so we rate limit over all API calls
-var lastTimeApiCall = time.Now()
+// This is a global variable, so we rate limit over all API calls
+var rateLimiter = ratelimit.New(1)
 
 func downloadMangasBySearching(dirMangas string, ctx context.Context, client *mangadex.APIClient,
 	tagId2Tag *map[string]mangadex.Tag,
@@ -33,15 +33,15 @@ func downloadMangasBySearching(dirMangas string, ctx context.Context, client *ma
 
 	// Default includes we should use!
 	optsIncludes := make([]string, 0)
-	optsIncludes = append(optsIncludes, "author")
+	/*optsIncludes = append(optsIncludes, "author")
 	optsIncludes = append(optsIncludes, "artist")
-	optsIncludes = append(optsIncludes, "cover_art")
+	optsIncludes = append(optsIncludes, "cover_art")*/
 
 	// Specify our max limit and loop through the entire API to get all manga
 	currentLimit := int32(100)
 	maxOffset := int32(10000)
 	for currentOffset := int32(0); currentOffset < maxOffset; currentOffset += currentLimit {
-
+		rateLimiter.Take()
 		// Perform our api search call to get the response
 		opts := mangadex.MangaApiGetSearchMangaOpts{}
 		opts.Limit = optional.NewInt32(currentLimit)
@@ -64,25 +64,7 @@ func downloadMangasBySearching(dirMangas string, ctx context.Context, client *ma
 		err := errors.New("startup")
 		maxRetries := 10
 		for retryCount := 0; retryCount <= maxRetries && err != nil; retryCount++ {
-
-			// Pause if we need to retry as we are probably rate limited...
-			if retryCount > 0 {
-				//fmt.Printf("\u001B[1;31mretrying %d / %d times...\u001B[0m\n", retryCount, maxRetries)
-				time.Sleep(5 * time.Second)
-			}
-
-			// Rate limit if we have not waited enough
-			// NOTE: /manga has 10 reqs per 60 minutes limit (seems really slow...)
-			minMilliBetween := int64(500)
-			timeSinceLast := time.Since(lastTimeApiCall)
-			if timeSinceLast.Milliseconds() < minMilliBetween {
-				milliToWait := minMilliBetween - timeSinceLast.Milliseconds()
-				//fmt.Printf("\u001B[1;31mwaiting %d milliseconds\u001B[0m\n", milliToWait)
-				time.Sleep(time.Duration(milliToWait) * time.Millisecond)
-			}
-
-			// Api call to the mangadex api (5 req per second)
-			lastTimeApiCall = time.Now()
+			rateLimiter.Take()
 			mangaList, resp, err = client.MangaApi.GetSearchManga(ctx, &opts)
 			if err != nil {
 				fmt.Printf("\u001B[1;31mMANGA ERROR (%d of %d): %v\u001B[0m\n", retryCount, maxRetries, err)
@@ -93,9 +75,15 @@ func downloadMangasBySearching(dirMangas string, ctx context.Context, client *ma
 			} else if resp.StatusCode != 200 && resp.StatusCode != 204 {
 				err = errors.New("invalid http error code")
 				fmt.Printf("\u001B[1;31mMANGA ERROR (%d of %d): http code %d\u001B[0m\n", retryCount, maxRetries, resp.StatusCode)
+			} else if resp.StatusCode == 429 {
+				err = errors.New("rate limited")
+				fmt.Printf("\u001B[1;31mRate Limited!! Sleeping. (%d of %d): http code %d\u001B[0m\n", retryCount, maxRetries, resp.StatusCode)
+				time.Sleep(time.Duration(int64(500)) * time.Millisecond)
+
 			}
 			if err == nil {
-				resp.Body.Close()
+				//ignore the error if it fails to close
+				_ = resp.Body.Close()
 			}
 
 		}
@@ -126,7 +114,9 @@ func downloadMangasBySearching(dirMangas string, ctx context.Context, client *ma
 			//fmt.Printf("manga - %s \n", manga.Attributes.CreatedAt)
 			if !(*mangasDownloaded)[manga.Id] {
 				file, _ := json.MarshalIndent(manga, "", " ")
-				_ = ioutil.WriteFile(dirMangas+manga.Id+".json", file, 0644)
+				prefix := firstN(manga.Id, 4)
+				fileName := dirMangas + prefix + "/" + manga.Id + ".json"
+				_ = os.WriteFile(fileName, file, 0644)
 				(*mangasDownloaded)[manga.Id] = true
 			}
 		}
@@ -188,7 +178,7 @@ func main() {
 		log.Fatalf("HTTP ERROR CODE %d\n", resp.StatusCode)
 	}
 	file, _ := json.MarshalIndent(tagList, "", " ")
-	_ = ioutil.WriteFile(fileTagList, file, 0644)
+	_ = os.WriteFile(fileTagList, file, 0644)
 
 	// Generate unique combinations we will try for our tags
 	// This is to try to get as many mangas to be downloaded as possible
@@ -235,7 +225,9 @@ func main() {
 	algoCurr++
 	for ct, tags := range tagIdListCombinations {
 		if algoNum == -1 || algoNum == algoCurr {
-			downloadMangasBySearching(dirMangas, ctx, client, &tagId2Tag, &mangasDownloaded, tags, "safe", "")
+			for _, rating := range contentRatingIdList {
+				downloadMangasBySearching(dirMangas, ctx, client, &tagId2Tag, &mangasDownloaded, tags, rating, "")
+			}
 		}
 		if (ct+1)%len(tagIdList) == 0 {
 			algoCurr++
@@ -244,8 +236,10 @@ func main() {
 	for year := 2018; year <= time.Now().Year(); year++ {
 		if algoNum == -1 || algoNum == algoCurr {
 			for month := 1; month <= 12; month++ {
-				createdAtSince := strconv.Itoa(year) + "-" + fmt.Sprintf("%02d", month) + "-01T00:00:00"
-				downloadMangasBySearching(dirMangas, ctx, client, &tagId2Tag, &mangasDownloaded, []string{}, "safe", createdAtSince)
+				for _, rating := range contentRatingIdList {
+					createdAtSince := strconv.Itoa(year) + "-" + fmt.Sprintf("%02d", month) + "-01T00:00:00"
+					downloadMangasBySearching(dirMangas, ctx, client, &tagId2Tag, &mangasDownloaded, []string{}, rating, createdAtSince)
+				}
 			}
 		}
 		algoCurr++
@@ -253,4 +247,12 @@ func main() {
 	fmt.Printf("processed of %d call of %d total\n", algoNum, algoCurr)
 	fmt.Printf("downloaded %d mangas in %s!!\n\n", len(mangasDownloaded), time.Since(start))
 
+}
+
+func firstN(str string, n int) string {
+	v := []rune(str)
+	if n >= len(v) {
+		return str
+	}
+	return string(v[:n])
 }
