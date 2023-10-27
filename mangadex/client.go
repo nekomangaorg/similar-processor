@@ -1,7 +1,7 @@
 /*
  * MangaDex API
  *
- * MangaDex is an ad-free manga reader offering high-quality images!  This document details our API as it is right now. It is in no way a promise to never change it, although we will endeavour to publicly notify any major change.  # Acceptable use policy  Usage of our services implies acceptance of the following: - You **MUST** credit us - You **MUST** credit scanlation groups if you offer the ability to read chapters - You **CANNOT** run ads or paid services on your website and/or apps  These may change at any time for any and no reason and it is up to you check for updates from time to time.  # Security issues  If you believe you found a security issue in our API, please check our [security.txt](/security.txt) to get in touch privately. 
+ * MangaDex is an ad-free manga reader offering high-quality images!  This document details our API as it is right now. It is in no way a promise to never change it, although we will endeavour to publicly notify any major change.  # Acceptable use policy  Usage of our services implies acceptance of the following: - You **MUST** credit us - You **MUST** credit scanlation groups if you offer the ability to read chapters - You **CANNOT** run ads or paid services on your website and/or apps  These may change at any time for any and no reason and it is up to you check for updates from time to time.  # Security issues  If you believe you found a security issue in our API, please check our [security.txt](/security.txt) to get in touch privately.
  *
  * API version: 5.9.0
  * Contact: support@mangadex.org
@@ -310,6 +310,8 @@ func (c *APIClient) prepareRequest(
 	// Encode the parameters.
 	url.RawQuery = query.Encode()
 
+	fmt.Println(url.String())
+
 	// Generate a new request
 	if body != nil {
 		localVarRequest, err = http.NewRequest(method, url.String(), body)
@@ -373,17 +375,17 @@ func (c *APIClient) prepareRequest(
 }
 
 func (c *APIClient) decode(v interface{}, b []byte, contentType string) (err error) {
-		if strings.Contains(contentType, "application/xml") {
-			if err = xml.Unmarshal(b, v); err != nil {
-				return err
-			}
-			return nil
-		} else if strings.Contains(contentType, "application/json") {
-			if err = json.Unmarshal(b, v); err != nil {
-				return err
-			}
-			return nil
+	if strings.Contains(contentType, "application/xml") {
+		if err = xml.Unmarshal(b, v); err != nil {
+			return err
 		}
+		return nil
+	} else if strings.Contains(contentType, "application/json") {
+		if err = json.Unmarshal(b, v); err != nil {
+			return err
+		}
+		return nil
+	}
 	return errors.New("undefined response type " + contentType)
 }
 
