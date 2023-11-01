@@ -1,6 +1,7 @@
 package similar
 
 import (
+	"github.com/similar-manga/similar/internal"
 	"github.com/similar-manga/similar/mangadex"
 	"strings"
 )
@@ -86,6 +87,78 @@ var OneWayTags = []mangadex.Tag{
 			Version: 1,
 		},
 	},
+}
+
+func NotValidMatch2(manga internal.Manga, mangaOther internal.Manga) bool {
+
+	// Enforce that the two do not have another as a *related* manga
+	for _, relatedId := range manga.RelatedIds {
+		if relatedId == mangaOther.Id {
+			return true
+		}
+	}
+
+	for _, relatedId := range mangaOther.RelatedIds {
+		if relatedId == manga.Id {
+			return true
+		}
+	}
+
+	// Enforce that our two demographics are the same
+	if manga.ContentRating != "" &&
+		manga.ContentRating != mangaOther.ContentRating {
+		return true
+	}
+
+	// Small check for "promo" titles, don't match to promotional titles
+	title := strings.ToLower((*manga.Title)["en"])
+	titleOther := strings.ToLower((*mangaOther.Title)["en"])
+	if !strings.Contains(title, "(promo)") && strings.Contains(titleOther, "(promo)") {
+		return true
+	}
+
+	// Enforce that our two demographics are the same
+	if manga.PublicationDemographic != "" &&
+		manga.PublicationDemographic != mangaOther.PublicationDemographic {
+		return true
+	}
+
+	// No need to check tags for our top level content ratings
+	// They will be a valid match no matter the tags (not that many options thus can't limit)
+	if manga.ContentRating == "erotica" || manga.ContentRating == "pornographic" {
+		return false
+	}
+
+	// Next we should enforce the following tags
+	for _, tag1 := range OneWayTags {
+
+		// Check to see if this tag is in our first manga
+		hasTag := false
+		for _, tag2 := range manga.Tags {
+			if tag2.Id == tag1.Id {
+				hasTag = true
+				break
+			}
+		}
+
+		// If we have the tag, then no need to check the other manga
+		// If we don't have it, then the other manga shouldn't have it..
+		if hasTag {
+			continue
+		}
+
+		// Check if other does not have the tag
+		for _, tag2 := range mangaOther.Tags {
+			if tag2.Id == tag1.Id {
+				return true
+			}
+		}
+
+	}
+
+	// Else this is a valid match we can use!
+	return false
+
 }
 
 func NotValidMatch(manga mangadex.Manga, mangaOther mangadex.Manga) bool {

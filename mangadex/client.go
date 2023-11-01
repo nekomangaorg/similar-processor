@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -43,51 +42,7 @@ type APIClient struct {
 	cfg    *Configuration
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 
-	// API Services
-
-	AccountApi *AccountApiService
-
-	AtHomeApi *AtHomeApiService
-
-	AuthenticationApi *AuthenticationApiService
-
-	AuthorApi *AuthorApiService
-
-	CaptchaApi *CaptchaApiService
-
-	ChapterApi *ChapterApiService
-
-	CoverApi *CoverApiService
-
-	CustomListApi *CustomListApiService
-
-	FeedApi *FeedApiService
-
-	FollowsApi *FollowsApiService
-
-	ForumsApi *ForumsApiService
-
-	InfrastructureApi *InfrastructureApiService
-
-	LegacyApi *LegacyApiService
-
 	MangaApi *MangaApiService
-
-	RatingApi *RatingApiService
-
-	ReadMarkerApi *ReadMarkerApiService
-
-	ReportApi *ReportApiService
-
-	ScanlationGroupApi *ScanlationGroupApiService
-
-	SettingsApi *SettingsApiService
-
-	StatisticsApi *StatisticsApiService
-
-	UploadApi *UploadApiService
-
-	UserApi *UserApiService
 }
 
 type service struct {
@@ -105,35 +60,9 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.cfg = cfg
 	c.common.client = c
 
-	// API Services
-	c.AccountApi = (*AccountApiService)(&c.common)
-	c.AtHomeApi = (*AtHomeApiService)(&c.common)
-	c.AuthenticationApi = (*AuthenticationApiService)(&c.common)
-	c.AuthorApi = (*AuthorApiService)(&c.common)
-	c.CaptchaApi = (*CaptchaApiService)(&c.common)
-	c.ChapterApi = (*ChapterApiService)(&c.common)
-	c.CoverApi = (*CoverApiService)(&c.common)
-	c.CustomListApi = (*CustomListApiService)(&c.common)
-	c.FeedApi = (*FeedApiService)(&c.common)
-	c.FollowsApi = (*FollowsApiService)(&c.common)
-	c.ForumsApi = (*ForumsApiService)(&c.common)
-	c.InfrastructureApi = (*InfrastructureApiService)(&c.common)
-	c.LegacyApi = (*LegacyApiService)(&c.common)
 	c.MangaApi = (*MangaApiService)(&c.common)
-	c.RatingApi = (*RatingApiService)(&c.common)
-	c.ReadMarkerApi = (*ReadMarkerApiService)(&c.common)
-	c.ReportApi = (*ReportApiService)(&c.common)
-	c.ScanlationGroupApi = (*ScanlationGroupApiService)(&c.common)
-	c.SettingsApi = (*SettingsApiService)(&c.common)
-	c.StatisticsApi = (*StatisticsApiService)(&c.common)
-	c.UploadApi = (*UploadApiService)(&c.common)
-	c.UserApi = (*UserApiService)(&c.common)
 
 	return c
-}
-
-func atoi(in string) (int, error) {
-	return strconv.Atoi(in)
 }
 
 // selectHeaderContentType select a content type from the available list.
@@ -168,20 +97,6 @@ func contains(haystack []string, needle string) bool {
 		}
 	}
 	return false
-}
-
-// Verify optional parameters are of the correct type.
-func typeCheckParameter(obj interface{}, expected string, name string) error {
-	// Make sure there is an object.
-	if obj == nil {
-		return nil
-	}
-
-	// Check the type is as expected.
-	if reflect.TypeOf(obj).String() != expected {
-		return fmt.Errorf("Expected %s to be of type %s but received %s.", name, expected, reflect.TypeOf(obj).String())
-	}
-	return nil
 }
 
 // parameterToString convert interface{} parameters to string, using a delimiter if format is provided.

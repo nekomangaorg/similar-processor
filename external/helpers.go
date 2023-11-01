@@ -20,4 +20,3 @@ func WriteToCSV(writer *csv.Writer, data []string) {
 		log.Fatal(err)
 	}
 }
-
