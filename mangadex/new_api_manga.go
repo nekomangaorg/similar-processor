@@ -13,9 +13,9 @@ var (
 	_ context.Context
 )
 
-type MangaApiService2 service
+type MangaApiService service
 
-type MangaApiGetSearchMangaOpts2 struct {
+type MangaApiGetSearchMangaOpts struct {
 	Limit          optional.Int32
 	Offset         optional.Int32
 	Ids            optional.Interface
@@ -23,7 +23,7 @@ type MangaApiGetSearchMangaOpts2 struct {
 	UpdatedAtSince optional.String
 }
 
-func (a *MangaApiService) GetSearchManga2(ctx context.Context, localVarOptionals *MangaApiGetSearchMangaOpts2) (MangaList, *http.Response, error) {
+func (a *MangaApiService) GetSearchManga2(ctx context.Context, localVarOptionals *MangaApiGetSearchMangaOpts) (MangaList, *http.Response, error) {
 	var (
 		localVarHttpMethod  = strings.ToUpper("Get")
 		localVarPostBody    interface{}
