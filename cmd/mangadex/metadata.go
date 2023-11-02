@@ -38,16 +38,20 @@ func runMetadata(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 
 	if updateAll {
+		fmt.Printf("Getting mangadex metadata for all entries\n")
+
 		rateLimiter := ratelimit.New(1)
 
 		mangaIdArray := collectAllMangaIds()
 
-		for _, ids := range mangaIdArray {
+		for index, ids := range mangaIdArray {
 
-			opts := mangadex.MangaApiGetSearchMangaOpts2{}
+			opts := mangadex.MangaApiGetSearchMangaOpts{}
 			opts.OrderCreatedAt = optional.NewString("desc")
 			opts.Limit = optional.NewInt32(100)
 			opts.Ids = optional.NewInterface(ids)
+
+			fmt.Printf("Getting mangadex metadata for batch group %d/%d\n", index+1, len(mangaIdArray))
 
 			mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
@@ -69,6 +73,9 @@ func runMetadata(cmd *cobra.Command, args []string) {
 		for fileScanner.Scan() {
 			lastUpdatedTime = fileScanner.Text()
 		}
+
+		fmt.Printf("Getting mangadex metadata since last updated time -> %s\n", lastUpdatedTime)
+
 		readFile.Close()
 
 		currentLimit := int32(100)
@@ -77,10 +84,11 @@ func runMetadata(cmd *cobra.Command, args []string) {
 
 		for currentOffset := int32(0); currentOffset < maxOffset && done == false; currentOffset += currentLimit {
 
-			opts := mangadex.MangaApiGetSearchMangaOpts2{}
+			opts := mangadex.MangaApiGetSearchMangaOpts{}
 			opts.UpdatedAtSince = optional.NewString(lastUpdatedTime)
 			opts.Limit = optional.NewInt32(currentLimit)
 			opts.Offset = optional.NewInt32(currentOffset)
+			fmt.Printf("Getting mangadex metadata for offset %d\n", currentOffset)
 
 			mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
@@ -101,6 +109,8 @@ func runMetadata(cmd *cobra.Command, args []string) {
 	internal.CheckErr(err)
 	metadataFile.Close()
 
+	ExportManga()
+
 	fmt.Printf("\t- Finished in %s\n", time.Since(start))
 }
 
@@ -110,7 +120,7 @@ func collectAllMangaIds() [][]string {
 	dbOffset := 0
 
 	for processing {
-		rows, _ := internal.MangaDB.Query("SELECT UUID FROM MANGA ORDER BY UUID LIMIT 100 OFFSET " + strconv.Itoa(dbOffset))
+		rows, _ := internal.DB.Query("SELECT UUID FROM MANGA ORDER BY UUID LIMIT 100 OFFSET " + strconv.Itoa(dbOffset))
 		var mangaIds []string
 		for rows.Next() {
 			var uuid string

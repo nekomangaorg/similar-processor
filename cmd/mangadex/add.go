@@ -24,6 +24,7 @@ func init() {
 }
 
 func runAdd(cmd *cobra.Command, args []string) {
+
 	rateLimiter := ratelimit.New(1, ratelimit.Per(2*time.Second))
 
 	client := CreateMangaDexClient()
@@ -32,10 +33,11 @@ func runAdd(cmd *cobra.Command, args []string) {
 	currentLimit := int32(100)
 	maxOffset := int32(10000)
 	done := false
+	count := 0
 
 	for currentOffset := int32(0); currentOffset < maxOffset && done == false; currentOffset += currentLimit {
 
-		opts := mangadex.MangaApiGetSearchMangaOpts2{}
+		opts := mangadex.MangaApiGetSearchMangaOpts{}
 		opts.OrderCreatedAt = optional.NewString("desc")
 		opts.Limit = optional.NewInt32(currentLimit)
 		opts.Offset = optional.NewInt32(currentOffset)
@@ -43,15 +45,18 @@ func runAdd(cmd *cobra.Command, args []string) {
 		mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
 		for _, apiManga := range mangaList.Data {
-
 			if !ExistsInDatabase(apiManga.Id) {
-				InsertManga(apiManga)
+				count++
+				UpsertManga(apiManga)
+				fmt.Printf("Inserting manga with ID: %s\n", apiManga.Id)
 			} else {
-				fmt.Printf("\nFound manga in DB with ID: %s.\nFinished processing.\n", apiManga.Id)
 				done = true
 				break
 			}
-
 		}
 	}
+	fmt.Printf("Inserted %d manga\n", count)
+
+	ExportManga()
+
 }

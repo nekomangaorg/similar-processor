@@ -1,6 +1,7 @@
 package mangadex
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,9 +9,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/similar-manga/similar/internal"
 	"github.com/similar-manga/similar/mangadex"
-	"github.com/similar-manga/similar/similar"
 	"go.uber.org/ratelimit"
+	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -44,20 +46,23 @@ func ApiMangaToJson(apiManga mangadex.Manga) []byte {
 		Tags:                         tags,
 	}
 
-	jsonManga, _ := json.MarshalIndent(manga, "", " ")
-	return jsonManga
+	dst := &bytes.Buffer{}
+	jsonManga, _ := json.Marshal(manga)
+	err := json.Compact(dst, jsonManga)
+	internal.CheckErr(err)
+	return dst.Bytes()
 }
 
 func CreateMangaDexClient() *mangadex.APIClient {
 	config := mangadex.NewConfiguration()
-	config.UserAgent = "calculate-manga v3.0"
+	config.UserAgent = "similar-manga v3.0"
 	config.HTTPClient = &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 	return mangadex.NewAPIClient(config)
 }
 
-func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, ctx context.Context, opts mangadex.MangaApiGetSearchMangaOpts2) mangadex.MangaList {
+func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, ctx context.Context, opts mangadex.MangaApiGetSearchMangaOpts) mangadex.MangaList {
 	maxRetries := 10
 	mangaList := mangadex.MangaList{}
 	resp := &http.Response{}
@@ -96,42 +101,59 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 }
 
 func ExistsInDatabase(uuid string) bool {
-	rows, err := internal.MangaDB.Query("SELECT UUID FROM MANGA WHERE UUID= '" + uuid + "'")
+	rows, err := internal.DB.Query("SELECT UUID FROM MANGA WHERE UUID= '" + uuid + "'")
 	defer rows.Close()
 	internal.CheckErr(err)
 	return rows.Next()
 }
 
-func InsertManga(apiManga mangadex.Manga) {
-	fmt.Printf("Inserting manga with ID: %s\n", apiManga.Id)
-	jsonManga := ApiMangaToJson(apiManga)
-	stmt, _ := internal.MangaDB.Prepare("INSERT INTO manga (uuid, manga_json) VALUES (?, ?)")
-	defer stmt.Close()
-	stmt.Exec(apiManga.Id, jsonManga)
-}
-
-func UpdateManga(apiManga mangadex.Manga) {
-	jsonManga := ApiMangaToJson(apiManga)
-	stmt, err := internal.MangaDB.Prepare("UPDATE MANGA set UUID = ?, MANGA_JSON = ? where UUID = ?")
-	defer stmt.Close()
-	internal.CheckErr(err)
-	_, err = stmt.Exec(apiManga.Id, jsonManga, apiManga.Id)
-	internal.CheckErr(err)
-}
-
-func UpdateMangaSimilarData(similarData similar.SimilarManga) {
-	jsonSimilar, _ := json.MarshalIndent(similarData, "", " ")
-	stmt, err := internal.MangaDB.Prepare("UPDATE MANGA set  SIMILAR_JSON = ? where UUID = ?")
-	defer stmt.Close()
-	internal.CheckErr(err)
-	_, err = stmt.Exec(jsonSimilar, similarData.Id)
-	internal.CheckErr(err)
-}
-
 func UpsertManga(apiManga mangadex.Manga) {
-	if !ExistsInDatabase(apiManga.Id) {
-		InsertManga(apiManga)
-	} else {
-		UpdateManga(apiManga)
+	jsonManga := ApiMangaToJson(apiManga)
+	_, err := internal.DB.Exec("INSERT INTO MANGA (UUID, JSON) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", apiManga.Id, jsonManga)
+	internal.CheckErr(err)
+}
+
+func getDBManga() []internal.DbManga {
+	rows, err := internal.DB.Query("SELECT UUID, JSON FROM MANGA")
+	defer rows.Close()
+	internal.CheckErr(err)
+
+	var mangaList []internal.DbManga
+	for rows.Next() {
+		manga := internal.DbManga{}
+		rows.Scan(&manga.Id, &manga.JSON)
+		internal.CheckErr(err)
+		mangaList = append(mangaList, manga)
 	}
+	return mangaList
+}
+
+func ExportManga() {
+	fmt.Printf("Exporting All Manga to csv files\n")
+	os.RemoveAll("data/manga/")
+	os.MkdirAll("data/manga/", 0755)
+	mangaList := getDBManga()
+	suffix := 1
+	file := createMangaFile(suffix)
+	for index, manga := range mangaList {
+		if index > 0 && index%1000 == 0 {
+			suffix++
+			file.Close()
+			file = createMangaFile(suffix)
+		}
+
+		file.WriteString(manga.Id + ":::" + manga.JSON + "\n")
+
+	}
+
+	file.Close()
+
+}
+
+func createMangaFile(number int) *os.File {
+	file, err := os.Create("data/manga/manga_" + fmt.Sprintf("%04d", number) + ".csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return file
 }

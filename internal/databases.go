@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-var MangaDB *sql.DB
+var DB *sql.DB
 
 func ConnectMangaDB() {
 	db, err := sql.Open("sqlite3", "data/manga.db")
@@ -13,7 +13,7 @@ func ConnectMangaDB() {
 		panic(err.Error())
 	}
 	db.SetMaxOpenConns(1)
-	MangaDB = db
+	DB = db
 }
 
 func CheckErr(err error) {

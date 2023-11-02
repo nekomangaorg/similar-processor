@@ -4,7 +4,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type DbManga struct {
+type DbSimilar struct {
 	Id   string
 	JSON string
 }
