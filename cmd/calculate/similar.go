@@ -7,7 +7,6 @@ import (
 	"github.com/james-bowman/nlp/measures/pairwise"
 	"github.com/james-bowman/sparse"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/similar-manga/similar/cmd/mangadex"
 	"github.com/similar-manga/similar/internal"
 	"github.com/similar-manga/similar/similar"
 	"github.com/spf13/cobra"
@@ -19,24 +18,27 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 var similarCmd = &cobra.Command{
 	Use:   "similar",
 	Short: "This updates the similar calculations",
-	Long:  `Calculate and update the similar generations for manga entries`,
+	Long:  `\nCalculate and update the similar generations for manga entries`,
 	Run:   runSimilar,
 }
 
 func init() {
 	calculateCmd.AddCommand(similarCmd)
-	calculateCmd.PersistentFlags().IntP("amount", "a", 0, "limit the total manga processed")
-
+	calculateCmd.PersistentFlags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
+	calculateCmd.PersistentFlags().BoolP("debug", "d", false, "Run a set of `debug` entries only.  Printing results to the screen only.")
 }
 func runSimilar(cmd *cobra.Command, args []string) {
 	startProcessing := time.Now()
+	fmt.Printf("\nBegin calculating similars\n")
+
 	// Settings
-	numSimToGet := 16
+	numSimToGet := 40
 	tagScoreRatio := 0.40
 	ignoreDescScoreUnder := 0.01
 	acceptDescScoreOver := 0.45
@@ -49,6 +51,23 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	corpusTag := []string{}
 	corpusDesc := []string{}
 	corpusDescLength := []int{}
+
+	debugMode, _ := cmd.Flags().GetBool("debug")
+	skippedMode, _ := cmd.Flags().GetBool("skipped")
+
+	// Debug check / skip mangas
+	debugMangaIds := map[string]bool{"f7888782-0727-49b0-95ec-a3530c70f83b": true, "e56a163f-1a4c-400b-8c1d-6cb98e63ce04": true, "ee0df4ab-1e8d-49b9-9404-da9dcb11a32a": true, "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0": true, "d46d9573-2ad9-45b2-9b6d-45f95452d1c0": true,
+		"e78a489b-6632-4d61-b00b-5206f5b8b22b": true, "58bc83a0-1808-484e-88b9-17e167469e23": true, "0fa5dab2-250a-4f69-bd15-9ceea54176fa": true}
+	if debugMode {
+		fmt.Printf("\nRunning in Debug mode for the following ids:\n")
+		for k := range debugMangaIds {
+			fmt.Printf("  - %s\n", k)
+		}
+		fmt.Println("\n")
+
+	} else {
+		DeleteSimilarDB()
+	}
 
 	mangaList := GetAllManga()
 
@@ -82,14 +101,12 @@ func runSimilar(cmd *cobra.Command, args []string) {
 		corpusDesc = append(corpusDesc, descText)
 		corpusDescLength = append(corpusDescLength, len(strings.Split(descText, " ")))
 	}
-	amountOfMangaToProcess, _ := cmd.Flags().GetInt("amount")
+	amountOfMangaToProcess := len(mangaList)
 
-	if amountOfMangaToProcess == 0 {
-		amountOfMangaToProcess = len(mangaList)
+	if debugMode {
+		amountOfMangaToProcess = len(debugMangaIds)
 	}
-	fmt.Printf("Amount of manga to process %d\n", amountOfMangaToProcess)
-
-	fmt.Printf("loaded %d manga in our corpus\n", len(corpusDesc))
+	fmt.Printf("\n\nLoaded %d Manga into our corpus\n\n", len(corpusDesc))
 
 	// Create our tf-idf pipeline
 	lsiTagVectoriser := nlp.NewCountVectoriser([]string{}...)
@@ -184,20 +201,15 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	// https://stackoverflow.com/a/25306241/7718197
 	// https://downey.io/notes/dev/openmp-parallel-for-in-golang/
 	var wg sync.WaitGroup
-	wg.Add(amountOfMangaToProcess)
-	//1000 -> 21mins
-	maxGoroutines := 2000
+	wg.Add(len(mangaList))
+	maxGoroutines := 1000
 	guard := make(chan struct{}, maxGoroutines)
-	//var mu sync.Mutex
 
 	//	// For each manga we will get the top calculate for tags and description
 	//	// We will then combine these into a single score which is then used to rank all manga
 	start = time.Now()
 
 	for currentMangaIndex := 0; currentMangaIndex < len(mangaList); currentMangaIndex++ {
-		if currentMangaIndex > amountOfMangaToProcess {
-			continue
-		}
 
 		// would block if guard channel is already filled
 		guard <- struct{}{}
@@ -218,6 +230,14 @@ func runSimilar(cmd *cobra.Command, args []string) {
 				<-guard
 				return
 			}
+			if debugMode {
+				if _, ok := debugMangaIds[currentManga.Id]; !ok {
+					<-guard
+					return
+				}
+			}
+
+			var sb strings.Builder
 
 			// Perform matching to all the other vectors
 			var matches []customMatch
@@ -259,6 +279,8 @@ func runSimilar(cmd *cobra.Command, args []string) {
 				return matches[i].Distance > matches[j].Distance
 			})
 
+			fmt.Fprintf(&sb, "Manga %d has %d tags -> %s - https://mangadex.org/title/%s\n", currentMangaIndex, numTags, (*currentManga.Title)["en"], currentManga.Id)
+
 			// Create our calculate manga api object which will have our matches in it
 			similarMangaData := similar.SimilarManga{}
 			similarMangaData.Id = currentManga.Id
@@ -274,7 +296,10 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 				matchManga := mangaList[matchIndex]
 
-				if invalidForProcessing(match, currentMangaIndex, currentManga, matchManga) {
+				if invalid, reason := invalidForProcessing(match, currentMangaIndex, currentManga, matchManga); invalid {
+					if skippedMode {
+						fmt.Fprintf(&sb, "  | skipped because %s ->%s - https://mangadex.org/title/%s\n", reason, truncateText((*matchManga.Title)["en"], 30), matchManga.Id)
+					}
 					continue
 				}
 
@@ -302,50 +327,60 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 			// Finally if we have non-zero matches then we should save it!
 			if len(similarMangaData.SimilarMatches) > 0 {
-				mangadex.UpdateMangaSimilarData(similarMangaData)
+				if !debugMode {
+					InsertSimilarData(similarMangaData)
+				}
 			}
 			countMangasProcessed++
 			avgIterTime := float64(currentMangaIndex+1) / time.Since(start).Seconds()
 
-			{
-
-				var sb strings.Builder
-
-				fmt.Fprintf(&sb, "manga %d has %d tags -> %s - https://mangadex.org/title/%s\n", currentMangaIndex, numTags, (*currentManga.Title)["en"], currentManga.Id)
-				for i, match := range matchesBest {
-					id := match.ID.(int)
-					score := similarMangaData.SimilarMatches[i].Score
-					fmt.Fprintf(&sb, "  - matched %d (%.3f tag, %.3f desc, %.3f comb) -> %s - https://mangadex.org/title/%s\n",
-						id, match.DistanceTag, match.DistanceDesc, score, (*mangaList[id].Title)["en"], mangaList[id].Id)
-				}
-				fmt.Fprintf(&sb, "%d/%d processed at %.2f manga/sec....\n\n", currentMangaIndex+1, len(mangaList), avgIterTime)
-				fmt.Println(sb.String())
+			for i, match := range matchesBest {
+				id := match.ID.(int)
+				score := similarMangaData.SimilarMatches[i].Score
+				fmt.Fprintf(&sb, "  | matched %d (%.3f tag, %.3f desc, %.3f comb) -> %s - https://mangadex.org/title/%s\n",
+					id, match.DistanceTag, match.DistanceDesc, score, truncateText((*mangaList[id].Title)["en"], 30), mangaList[id].Id)
 			}
+			if !debugMode {
+				//This line makes no sense if we are in debug mode
+				fmt.Fprintf(&sb, "%d/%d processed at %.2f manga/sec....\n\n", currentMangaIndex+1, amountOfMangaToProcess, avgIterTime)
+			}
+			fmt.Println(sb.String())
+
 			<-guard
 		}(currentMangaIndex)
 
 	}
 	wg.Wait()
 
-	fmt.Printf("calculated simularity for in %s!!\n\n", time.Since(startProcessing))
+	fmt.Printf("Calculated simularities for %d Manga in %s\n\n", amountOfMangaToProcess, time.Since(startProcessing))
 
 }
 
-func invalidForProcessing(match customMatch, currentMangaIndex int, currentManga internal.Manga, matchManga internal.Manga) bool {
+func truncateText(text string, maxLen int) string {
+	lastSpaceIx := maxLen
+	len := 0
+	for i, r := range text {
+		if unicode.IsSpace(r) {
+			lastSpaceIx = i
+		}
+		len++
+		if len > maxLen {
+			return text[:lastSpaceIx] + "..."
+		}
+	}
+	return text
+}
+
+func invalidForProcessing(match customMatch, currentMangaIndex int, currentManga internal.Manga, matchManga internal.Manga) (bool, string) {
 	// Skip if not a valid score
 	if match.Distance <= 0 {
-		return true
+		return true, "Invalid Score"
 	}
 
 	// Skip if the same id
 	matchMangaIndexId := match.ID.(int)
 	if matchMangaIndexId == currentMangaIndex {
-		return true
-	}
-
-	// Skip if no chapters
-	if matchManga.LastChapter == "" {
-		return true
+		return true, "Same UUID"
 	}
 
 	// Skip if no common languages
@@ -363,16 +398,16 @@ func invalidForProcessing(match customMatch, currentMangaIndex int, currentManga
 		}
 	}
 	if !foundCommonLang && len(currentManga.AvailableTranslatedLanguages) > 0 {
-		return true
+		return true, "No Common Languages"
 	}
 
 	// Tags / content ratings / demographics we enforce
 	// Also enforce that the manga can't be *related* to the match
 	if similar.NotValidMatch2(currentManga, matchManga) {
-		return true
+		return true, "Tag Check"
 	}
 
-	return false
+	return false, ""
 }
 
 // Type of match which also stores the description
