@@ -114,7 +114,7 @@ func UpsertManga(apiManga mangadex.Manga) {
 }
 
 func getDBManga() []internal.DbManga {
-	rows, err := internal.DB.Query("SELECT UUID, JSON FROM MANGA")
+	rows, err := internal.DB.Query("SELECT UUID, JSON FROM MANGA ORDER BY UUID ASC")
 	defer rows.Close()
 	internal.CheckErr(err)
 

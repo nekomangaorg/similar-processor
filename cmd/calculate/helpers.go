@@ -1,17 +1,18 @@
 package calculate
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/similar-manga/similar/internal"
-	"github.com/similar-manga/similar/similar"
 	"log"
 	"os"
+	"strings"
 )
 
 func GetAllManga() []internal.Manga {
-	rows, err := internal.DB.Query("SELECT JSON FROM MANGA")
+	rows, err := internal.DB.Query("SELECT JSON FROM MANGA ORDER BY UUID ASC ")
 	defer rows.Close()
 	internal.CheckErr(err)
 
@@ -32,7 +33,7 @@ func DeleteSimilarDB() {
 	internal.CheckErr(err)
 }
 
-func InsertSimilarData(similarData similar.SimilarManga) {
+func InsertSimilarData(similarData internal.SimilarManga) {
 	dst := &bytes.Buffer{}
 	jsonSimilar, _ := json.Marshal(similarData)
 	err := json.Compact(dst, jsonSimilar)
@@ -74,5 +75,46 @@ func ExportSimilar() {
 		file.Close()
 
 	}
+}
 
+func CreateMappingsFile(fileName string) *os.File {
+	file, err := os.Create("data/mappings/" + fileName + ".csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return file
+}
+
+func OpenMappingsFile(fileName string) *os.File {
+	file, err := os.OpenFile("data/mappings/"+fileName+".csv", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return file
+}
+
+func FileAsMap(file *os.File) map[string]string {
+	scanner := bufio.NewScanner(file)
+	m := make(map[string]string)
+	for scanner.Scan() {
+		split := strings.Split(scanner.Text(), ":::")
+		if len(split) > 0 {
+			m[split[0]] = split[1]
+		}
+	}
+
+	return m
+}
+
+func FileAsMapReverse(file *os.File) map[string]string {
+	scanner := bufio.NewScanner(file)
+	m := make(map[string]string)
+	for scanner.Scan() {
+		split := strings.Split(scanner.Text(), ":::")
+		if len(split) > 0 {
+			m[split[1]] = split[0]
+		}
+	}
+
+	return m
 }

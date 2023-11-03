@@ -1,4 +1,4 @@
-package similar
+package similar_helpers
 
 import (
 	"github.com/caneroj1/stemmer"

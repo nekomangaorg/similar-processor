@@ -7,8 +7,8 @@ import (
 	"github.com/james-bowman/nlp/measures/pairwise"
 	"github.com/james-bowman/sparse"
 	_ "github.com/mattn/go-sqlite3"
+	similar "github.com/similar-manga/similar/cmd/calculate/similar_helpers"
 	"github.com/similar-manga/similar/internal"
-	"github.com/similar-manga/similar/similar"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
 	"log"
@@ -35,9 +35,7 @@ func init() {
 }
 func runSimilar(cmd *cobra.Command, args []string) {
 	startProcessing := time.Now()
-	ExportSimilar()
 
-	return
 	fmt.Printf("\nBegin calculating similars\n")
 
 	// Settings
@@ -51,9 +49,9 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	// Loop through all manga and try to get their chapter information for each
 	countMangasProcessed := 0
 
-	corpusTag := []string{}
-	corpusDesc := []string{}
-	corpusDescLength := []int{}
+	var corpusTag []string
+	var corpusDesc []string
+	var corpusDescLength []int
 
 	debugMode, _ := cmd.Flags().GetBool("debug")
 	skippedMode, _ := cmd.Flags().GetBool("skipped")
@@ -285,7 +283,7 @@ func runSimilar(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(&sb, "Manga %d has %d tags -> %s - https://mangadex.org/title/%s\n", currentMangaIndex, numTags, (*currentManga.Title)["en"], currentManga.Id)
 
 			// Create our calculate manga api object which will have our matches in it
-			similarMangaData := similar.SimilarManga{}
+			similarMangaData := internal.SimilarManga{}
 			similarMangaData.Id = currentManga.Id
 			similarMangaData.Title = *currentManga.Title
 			similarMangaData.ContentRating = currentManga.ContentRating
@@ -307,7 +305,7 @@ func runSimilar(cmd *cobra.Command, args []string) {
 				}
 
 				// Otherwise lets append it!
-				matchData := similar.SimilarMatch{}
+				matchData := internal.SimilarMatch{}
 				matchData.Id = matchManga.Id
 				matchData.Title = *matchManga.Title
 				matchData.ContentRating = matchManga.ContentRating
@@ -355,19 +353,23 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	}
 	wg.Wait()
 
+	if !debugMode {
+		ExportSimilar()
+	}
+
 	fmt.Printf("Calculated simularities for %d Manga in %s\n\n", amountOfMangaToProcess, time.Since(startProcessing))
 
 }
 
 func truncateText(text string, maxLen int) string {
 	lastSpaceIx := maxLen
-	len := 0
+	length := 0
 	for i, r := range text {
 		if unicode.IsSpace(r) {
 			lastSpaceIx = i
 		}
-		len++
-		if len > maxLen {
+		length++
+		if length > maxLen {
 			return text[:lastSpaceIx] + "..."
 		}
 	}
@@ -406,7 +408,7 @@ func invalidForProcessing(match customMatch, currentMangaIndex int, currentManga
 
 	// Tags / content ratings / demographics we enforce
 	// Also enforce that the manga can't be *related* to the match
-	if similar.NotValidMatch2(currentManga, matchManga) {
+	if similar.NotValidMatch(currentManga, matchManga) {
 		return true, "Tag Check"
 	}
 

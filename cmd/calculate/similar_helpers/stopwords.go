@@ -1,4 +1,4 @@
-package similar
+package similar_helpers
 
 var DescriptionLanguages = []string{
 	"Spanish:[spoiler]",
