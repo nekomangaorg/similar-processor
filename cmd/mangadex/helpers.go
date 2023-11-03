@@ -131,7 +131,7 @@ func getDBManga() []internal.DbManga {
 func ExportManga() {
 	fmt.Printf("Exporting All Manga to csv files\n")
 	os.RemoveAll("data/manga/")
-	os.MkdirAll("data/manga/", 0755)
+	os.MkdirAll("data/manga/", 0777)
 	mangaList := getDBManga()
 	suffix := 1
 	file := createMangaFile(suffix)

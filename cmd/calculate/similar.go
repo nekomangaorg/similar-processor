@@ -35,6 +35,9 @@ func init() {
 }
 func runSimilar(cmd *cobra.Command, args []string) {
 	startProcessing := time.Now()
+	ExportSimilar()
+
+	return
 	fmt.Printf("\nBegin calculating similars\n")
 
 	// Settings
