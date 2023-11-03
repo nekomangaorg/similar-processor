@@ -7,8 +7,8 @@ import (
 
 var DB *sql.DB
 
-func ConnectMangaDB() {
-	db, err := sql.Open("sqlite3", "data/manga.db")
+func ConnectDB() {
+	db, err := sql.Open("sqlite3", "data/data.db")
 	if err != nil {
 		panic(err.Error())
 	}

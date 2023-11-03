@@ -28,5 +28,5 @@ func Execute() {
 }
 
 func init() {
-	internal.ConnectMangaDB()
+	internal.ConnectDB()
 }

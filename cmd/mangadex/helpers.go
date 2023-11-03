@@ -142,7 +142,7 @@ func ExportManga() {
 			file = createMangaFile(suffix)
 		}
 
-		file.WriteString(manga.Id + ":::" + manga.JSON + "\n")
+		file.WriteString(manga.Id + ":::||@!@||:::" + manga.JSON + "\n")
 
 	}
 
