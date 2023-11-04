@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/similar-manga/similar/external"
@@ -24,6 +25,11 @@ func muEntryExistsInNewIDDatabase(uuid string) bool {
 
 func upsertNewMuId(uuid string, id string) {
 	_, err := internal.DB.Exec("INSERT INTO MANGAUPDATES_NEW (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
+	internal.CheckErr(err)
+}
+
+func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) {
+	_, err := tx.Exec("INSERT INTO "+table+" (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
 	internal.CheckErr(err)
 }
 
@@ -91,9 +97,8 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 		} else {
 
 			// We have a couple retires here
-			ctr := 0
-			ctrMax := 5
-			for ctr < ctrMax {
+			counterMax := 5
+			for counter := 1; counter < counterMax; counter++ {
 				rateLimiter.Take()
 
 				// If invalid, then try to get the page and parse it!
@@ -109,12 +114,19 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 				// Sleep if we get a warning, otherwise we don't retry again!
 				if err == nil && resp.StatusCode == 429 {
-					fmt.Printf("\u001B[1;31mEXTERNAL MU: http code %d (try %d of %d)\u001B[0m\n", resp.StatusCode, ctr, ctrMax)
+					fmt.Printf("\u001B[1;31m %s EXTERNAL MU: http code %d (try %d of %d)\u001B[0m\n", uuid, resp.StatusCode, counter, counterMax)
 					time.Sleep(2.0 * time.Second)
 				}
 				if err == nil && resp.StatusCode != 200 {
-					fmt.Printf("\u001B[1;31mEXTERNAL MU: http code %d (try %d of %d)\u001B[0m\n", resp.StatusCode, ctr, ctrMax)
-					time.Sleep(1.0 * time.Second)
+					if resp.StatusCode == 503 {
+						//this is a bad id on Dex's side write to debug file
+						WriteLineToDebugFile("BadMUIds", uuid)
+						return false
+					} else {
+						fmt.Printf("\u001B[1;31m %s EXTERNAL MU %s: http code %d (try %d of %d)\u001B[0m\n", uuid, url, resp.StatusCode, counter, counterMax)
+						time.Sleep(2.0 * time.Second)
+					}
+
 				}
 
 				// Load the HTML document
@@ -134,7 +146,6 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 						}
 					}
 				}
-				ctr += 1
 			}
 		}
 	}

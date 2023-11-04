@@ -27,6 +27,13 @@ _testmain.go
 
 # data folders
 data/*.db
+data/mappings/anilist2mdex.csv
+data/mappings/animeplanet2mdex.csv
+data/mappings/bookwalker2mdex.csv
+data/mappings/kitsu2mdex.csv
+data/mappings/novelupdates2mdex.csv
+data/mappings/myanimelist2mdex.csv
+data/mappings/mangaupdates2mdex.csv
 debug/*.txt
 
 

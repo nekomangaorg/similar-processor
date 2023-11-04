@@ -78,19 +78,64 @@ func ExportSimilar() {
 	}
 }
 
-func ExportMangaUpdatesNewIds() {
-	fmt.Printf("Exporting MangaUpdate new Ids\n")
-	file, err := os.Create("data/mappings/mangaupdates_new2mdex.csv")
+func WriteLineToDebugFile(fileName string, line string) {
+	os.MkdirAll("debug", 0777)
+	file, err := os.OpenFile("debug/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
 	internal.CheckErr(err)
-	genericList := getMangaUpdatesNewDB()
+	file.WriteString(line + "\n")
+	file.Close()
+}
+
+func ExportAniList() {
+	genericList := getAllGenericFromTable("ANILIST")
+	exportGeneric("anilist2mdex", genericList)
+}
+
+func ExportAnimePlanet() {
+	genericList := getAllGenericFromTable("ANIME_PLANET")
+	exportGeneric("animeplanet2mdex", genericList)
+}
+func ExportBookWalker() {
+	genericList := getAllGenericFromTable("BOOK_WALKER")
+	exportGeneric("bookwalker2mdex", genericList)
+}
+
+func ExportMangaUpdates() {
+	genericList := getAllGenericFromTable("MANGAUPDATES_OLD")
+	exportGeneric("mangaupdates2mdex", genericList)
+}
+
+func ExportNovelUpdates() {
+	genericList := getAllGenericFromTable("NOVEL_UPDATES")
+	exportGeneric("novelupdates2mdex", genericList)
+}
+
+func ExportKitsu() {
+	genericList := getAllGenericFromTable("KITSU")
+	exportGeneric("kitsu2mdex", genericList)
+}
+
+func ExportMyAnimeList() {
+	genericList := getAllGenericFromTable("MYANIMELIST")
+	exportGeneric("myanimelist2mdex", genericList)
+}
+
+func ExportMangaUpdatesNewIds() {
+	genericList := getAllGenericFromTable("MANGAUPDATES_NEW")
+	exportGeneric("mangaupdates_new2mdex", genericList)
+}
+
+func exportGeneric(fileName string, genericList []internal.DbGeneric) {
+	file, err := os.Create("data/mappings/" + fileName + ".csv")
+	internal.CheckErr(err)
 	for _, entry := range genericList {
 		file.WriteString(entry.ID + ":::||@!@||:::" + entry.UUID + "\n")
 	}
 	file.Close()
 }
 
-func getMangaUpdatesNewDB() []internal.DbGeneric {
-	rows, err := internal.DB.Query("SELECT UUID, ID FROM MANGAUPDATES_NEW ORDER BY UUID asc ")
+func getAllGenericFromTable(tableName string) []internal.DbGeneric {
+	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + tableName + " ORDER BY UUID asc ")
 	defer rows.Close()
 	internal.CheckErr(err)
 
