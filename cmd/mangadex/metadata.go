@@ -26,6 +26,7 @@ var metadataCmd = &cobra.Command{
 func init() {
 	mangadexCmd.AddCommand(metadataCmd)
 	metadataCmd.PersistentFlags().BoolP("all", "a", false, "queries and updates the entire database")
+	metadataCmd.PersistentFlags().StringP("id", "i", "", "update metadata for a specific uuid in the database")
 
 }
 
@@ -33,6 +34,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 	start := time.Now()
 
 	updateAll, _ := cmd.Flags().GetBool("all")
+	updateId, _ := cmd.Flags().GetString("id")
 
 	client := CreateMangaDexClient()
 	ctx := context.Background()
@@ -58,6 +60,19 @@ func runMetadata(cmd *cobra.Command, args []string) {
 			for _, apiManga := range mangaList.Data {
 				UpsertManga(apiManga)
 			}
+		}
+
+	} else if updateId != "" {
+		fmt.Printf("Updating MangaDex metadata for %s\n", updateId)
+		rateLimiter := ratelimit.New(1)
+
+		opts := mangadex.MangaApiGetSearchMangaOpts{}
+		opts.OrderCreatedAt = optional.NewString("desc")
+		opts.Limit = optional.NewInt32(1)
+		opts.Ids = optional.NewInterface([]string{updateId})
+		mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
+		for _, apiManga := range mangaList.Data {
+			UpsertManga(apiManga)
 		}
 
 	} else {

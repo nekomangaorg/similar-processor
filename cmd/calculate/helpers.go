@@ -1,14 +1,12 @@
 package calculate
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/similar-manga/similar/internal"
 	"log"
 	"os"
-	"strings"
 )
 
 func GetAllManga() []internal.Manga {
@@ -22,6 +20,9 @@ func GetAllManga() []internal.Manga {
 		var jsonManga []byte
 		rows.Scan(&jsonManga)
 		err := json.Unmarshal(jsonManga, &manga)
+		if err != nil {
+			fmt.Printf(string(jsonManga))
+		}
 		internal.CheckErr(err)
 		mangaList = append(mangaList, manga)
 	}
@@ -71,10 +72,36 @@ func ExportSimilar() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		file.WriteString(similar.Id + ":::" + similar.JSON + "\n")
+		file.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
 		file.Close()
 
 	}
+}
+
+func ExportMangaUpdatesNewIds() {
+	fmt.Printf("Exporting MangaUpdate new Ids\n")
+	file, err := os.Create("data/mappings/mangaupdates_new2mdex.csv")
+	internal.CheckErr(err)
+	genericList := getMangaUpdatesNewDB()
+	for _, entry := range genericList {
+		file.WriteString(entry.ID + ":::||@!@||:::" + entry.UUID + "\n")
+	}
+	file.Close()
+}
+
+func getMangaUpdatesNewDB() []internal.DbGeneric {
+	rows, err := internal.DB.Query("SELECT UUID, ID FROM MANGAUPDATES_NEW ORDER BY UUID asc ")
+	defer rows.Close()
+	internal.CheckErr(err)
+
+	var genericList []internal.DbGeneric
+	for rows.Next() {
+		similar := internal.DbGeneric{}
+		rows.Scan(&similar.UUID, &similar.ID)
+		internal.CheckErr(err)
+		genericList = append(genericList, similar)
+	}
+	return genericList
 }
 
 func CreateMappingsFile(fileName string) *os.File {
@@ -91,30 +118,4 @@ func OpenMappingsFile(fileName string) *os.File {
 		log.Fatal(err)
 	}
 	return file
-}
-
-func FileAsMap(file *os.File) map[string]string {
-	scanner := bufio.NewScanner(file)
-	m := make(map[string]string)
-	for scanner.Scan() {
-		split := strings.Split(scanner.Text(), ":::")
-		if len(split) > 0 {
-			m[split[0]] = split[1]
-		}
-	}
-
-	return m
-}
-
-func FileAsMapReverse(file *os.File) map[string]string {
-	scanner := bufio.NewScanner(file)
-	m := make(map[string]string)
-	for scanner.Scan() {
-		split := strings.Split(scanner.Text(), ":::")
-		if len(split) > 0 {
-			m[split[1]] = split[0]
-		}
-	}
-
-	return m
 }

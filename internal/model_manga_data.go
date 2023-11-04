@@ -6,7 +6,7 @@ type Manga struct {
 	AltTitles                    []map[string]string `json:"altTitles,omitempty"`
 	LastChapter                  string              `json:"lastChapter,omitempty"`
 	AvailableTranslatedLanguages []string            `json:"availableTranslatedLanguages,omitempty"`
-	RelatedIds                   []string            `json:"relatedIdds,omitempty"`
+	RelatedIds                   []string            `json:"relatedIds,omitempty"`
 	Description                  *map[string]string  `json:"description,omitempty"`
 	Links                        map[string]string   `json:"links,omitempty"`
 	OriginalLanguage             string              `json:"originalLanguage,omitempty"`

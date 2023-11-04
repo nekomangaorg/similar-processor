@@ -9,22 +9,32 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, file *os.File, fileMap map[string]string, rateLimiter ratelimit.Limiter) bool {
+func muEntryExistsInNewIDDatabase(uuid string) bool {
+	rows, err := internal.DB.Query("SELECT UUID FROM MANGAUPDATES_NEW WHERE UUID= '" + uuid + "'")
+	defer rows.Close()
+	internal.CheckErr(err)
+	return rows.Next()
+}
+
+func upsertNewMuId(uuid string, id string) {
+	_, err := internal.DB.Exec("INSERT INTO MANGAUPDATES_NEW (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
+	internal.CheckErr(err)
+}
+
+func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
 	if len(muLink) == 7 {
 		// Encode from base36 format
 		idEncoded := int64(external.Decode(muLink))
 		base10Id := strconv.FormatInt(idEncoded, 10)
 
-		//check if the mappings file already has the entry
-		if fileMap[base10Id] != "" {
-			fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id and Already exists in File\n", index+1, total, uuid, muLink, base10Id)
+		if muEntryExistsInNewIDDatabase(uuid) {
+			fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id and Already exists in database\n", index+1, total, uuid, muLink, base10Id)
 			return true
 		}
 
@@ -42,15 +52,14 @@ func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, fil
 		// Save if good!
 		if err == nil && resp2.StatusCode == 200 {
 			fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id!\n", index+1, total, uuid, muLink, base10Id)
-			_, err := io.WriteString(file, base10Id+":::"+uuid+"\n")
-			internal.CheckErr(err)
+			upsertNewMuId(uuid, base10Id)
 			return true
 		}
 	}
 	return false
 }
 
-func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, file *os.File, fileMap map[string]string, rateLimiter ratelimit.Limiter) bool {
+func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
 	// For our ID conversion
 	// https://www.unitconverters.net/numbers/base-36-to-decimal.htm
 	re := regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
@@ -62,18 +71,10 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, file 
 	idOriginal, err := strconv.Atoi(ints[0])
 	if err == nil {
 		convertedId := strconv.Itoa(idOriginal)
-		//check if id already exists by looping through the maps values
-		//check if the mappings file already has the entry
-		/*if fileMapReverse[uuid] != "" {
-			fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id and Already exists in File\n", index+1, total, uuid, muLink, fileMapReverse[uuid])
-			return true
-		}*/
 
-		for key, value := range fileMap {
-			if value == uuid {
-				fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id... but was already converted to %s and Already exists in file.\n", index+1, total, uuid, idOriginal, key)
-				return true
-			}
+		if muEntryExistsInNewIDDatabase(uuid) {
+			fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id... but was already converted and exists in database\n", index+1, total, uuid, idOriginal)
+			return true
 		}
 
 		rateLimiter.Take()
@@ -84,7 +85,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, file 
 
 		if err1 == nil && resp1.StatusCode == 200 {
 			fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id...\n", index+1, total, uuid, idOriginal)
-			_, err := io.WriteString(file, convertedId+":::"+uuid+"\n")
+			upsertNewMuId(uuid, convertedId)
 			internal.CheckErr(err)
 
 		} else {
@@ -128,8 +129,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, file 
 						if len(paths) > 3 {
 							rssId := paths[len(paths)-2]
 							fmt.Printf("%d/%d manga %s -> mu id of %d | RSS URL IS %s | %s id found\n", index+1, total, uuid, idOriginal, rssUrl, rssId)
-							_, err := io.WriteString(file, convertedId+":::"+uuid+"\n")
-							internal.CheckErr(err)
+							upsertNewMuId(uuid, convertedId)
 							return true
 						}
 					}

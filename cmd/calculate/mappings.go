@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"
+	"sync"
 	"time"
 )
 
@@ -29,12 +30,6 @@ func calculateMUIds() {
 	fmt.Println("Calculating New MangaUpdate Ids")
 	rateLimiter := ratelimit.New(1)
 
-	file := OpenMappingsFile("mangaupdates_new2mdex")
-	defer file.Close()
-
-	fileMap := FileAsMap(file)
-	//	fileMapReverse := FileAsMapReverse(file)
-
 	// mangaupdates
 	// https://www.mangaupdates.com/series.html?id=`{id}`
 	// https://api.mangaupdates.com/#operation/retrieveSeries
@@ -45,27 +40,36 @@ func calculateMUIds() {
 	start := time.Now()
 	mangaList := GetAllManga()
 	totalManga := len(mangaList)
+	var wg sync.WaitGroup
+	wg.Add(totalManga)
 	for index, manga := range mangaList {
 		// Our search file
-		if _, ok := manga.Links["mu"]; ok {
+		muLink := manga.Links["mu"]
+		go func(index int, totalManga int, uuid string, rateLimiter ratelimit.Limiter) {
+			defer wg.Done()
+			if muLink != "" {
+				// If the string is 7 long it is likely already the base36 format
+				// Thus we should try to directly extract from it the new API id
+				if AddAlreadyConvertedId(index, totalManga, uuid, muLink, rateLimiter) {
+					return
+				}
 
-			muLink := manga.Links["mu"]
-
-			// If the string is 7 long it is likely already the base36 format
-			// Thus we should try to directly extract from it the new API id
-			if AddAlreadyConvertedId(index, totalManga, manga.Id, muLink, file, fileMap, rateLimiter) {
-				continue
+				// Else lets try to extract the first int from the string
+				// This will be our API id number we will query with
+				if CheckAndAddLegacyId(index, totalManga, uuid, muLink, rateLimiter) {
+					return
+				}
+				fmt.Printf("%d/%d manga %s -> mu invalid %s\n", index+1, totalManga, uuid, muLink)
+			} else {
+				fmt.Printf("%d/%d manga %s -> has no MU id\n", index+1, totalManga, uuid)
 			}
+		}(index, totalManga, manga.Id, rateLimiter)
 
-			// Else lets try to extract the first int from the string
-			// This will be our API id number we will query with
-			if CheckAndAddLegacyId(index, totalManga, manga.Id, muLink, file, fileMap, rateLimiter) {
-				continue
-			}
-			fmt.Printf("%d/%d manga %s -> mu invalid %s\n", index+1, totalManga, manga.Id, muLink)
-		} else {
-			fmt.Printf("%d/%d manga %s -> has no MU id\n", index+1, totalManga, manga.Id)
-		}
 	}
+
+	wg.Wait()
+
+	ExportMangaUpdatesNewIds()
+
 	fmt.Printf("done processing MangaUpdates2NewUUID (%.2f seconds)!\n", time.Since(start).Seconds())
 }
