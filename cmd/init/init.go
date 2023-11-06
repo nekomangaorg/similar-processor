@@ -64,8 +64,8 @@ func createMangaDB() {
 }
 
 func populateMangaUpdatesMappingDB() {
-	file, err := os.Open("data/mappings/mangaupdates_new2mdex.csv")
-	fmt.Printf("Populating from  %s\n", "mangaupdates_new2mdex.csv")
+	file, err := os.Open("data/mappings/mangaupdates_new2mdex.txt")
+	fmt.Printf("Populating from  %s\n", "mangaupdates_new2mdex.txt")
 	defer file.Close()
 	internal.CheckErr(err)
 	scanner := bufio.NewScanner(file)

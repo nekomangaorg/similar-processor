@@ -32,11 +32,32 @@ func init() {
 	calculateCmd.AddCommand(similarCmd)
 	calculateCmd.PersistentFlags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
 	calculateCmd.PersistentFlags().BoolP("debug", "d", false, "Run a set of `debug` entries only.  Printing results to the screen only.")
+	calculateCmd.PersistentFlags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
+
 }
 func runSimilar(cmd *cobra.Command, args []string) {
-	startProcessing := time.Now()
 
-	fmt.Printf("\nBegin calculating similars\n")
+	debugMode, _ := cmd.Flags().GetBool("debug")
+	skippedMode, _ := cmd.Flags().GetBool("skipped")
+	exportOnly, _ := cmd.Flags().GetBool("export")
+
+	if !exportOnly {
+		fmt.Printf("\nBegin calculating similars\n")
+		calculateSimilars(debugMode, skippedMode)
+	}
+
+	if !debugMode {
+		startProcessing := time.Now()
+		fmt.Printf("Exporting All Similar to txt files\n")
+		ExportSimilar()
+		fmt.Printf("Exporting simularities took %s\n\n", time.Since(startProcessing))
+
+	}
+
+}
+
+func calculateSimilars(debugMode bool, skippedMode bool) {
+	startProcessing := time.Now()
 
 	// Settings
 	numSimToGet := 40
@@ -52,9 +73,6 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	var corpusTag []string
 	var corpusDesc []string
 	var corpusDescLength []int
-
-	debugMode, _ := cmd.Flags().GetBool("debug")
-	skippedMode, _ := cmd.Flags().GetBool("skipped")
 
 	// Debug check / skip mangas
 	debugMangaIds := map[string]bool{"f7888782-0727-49b0-95ec-a3530c70f83b": true, "e56a163f-1a4c-400b-8c1d-6cb98e63ce04": true, "ee0df4ab-1e8d-49b9-9404-da9dcb11a32a": true, "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0": true, "d46d9573-2ad9-45b2-9b6d-45f95452d1c0": true,
@@ -352,10 +370,6 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 	}
 	wg.Wait()
-
-	if !debugMode {
-		ExportSimilar()
-	}
 
 	fmt.Printf("Calculated simularities for %d Manga in %s\n\n", amountOfMangaToProcess, time.Since(startProcessing))
 

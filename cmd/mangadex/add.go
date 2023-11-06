@@ -14,8 +14,8 @@ import (
 // addCmd represents the new command
 var addCmd = &cobra.Command{
 	Use:   "add",
-	Short: "queries and adds all the new manga UUID's to csv",
-	Long:  `This searches for manga ordered by date added (newest first) and adds the Manga UUID to the csv until an existing UUID is found`,
+	Short: "queries and adds all the new manga UUID's to txt",
+	Long:  `This searches for manga ordered by date added (newest first) and adds the Manga UUID to the txt until an existing UUID is found`,
 	Run:   runAdd,
 }
 

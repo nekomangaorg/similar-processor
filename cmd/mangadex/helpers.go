@@ -129,7 +129,7 @@ func getDBManga() []internal.DbManga {
 }
 
 func ExportManga() {
-	fmt.Printf("Exporting All Manga to csv files\n")
+	fmt.Printf("Exporting All Manga to txt files\n")
 	os.RemoveAll("data/manga/")
 	os.MkdirAll("data/manga/", 0777)
 	mangaList := getDBManga()
@@ -151,7 +151,7 @@ func ExportManga() {
 }
 
 func createMangaFile(number int) *os.File {
-	file, err := os.Create("data/manga/manga_" + fmt.Sprintf("%04d", number) + ".csv")
+	file, err := os.Create("data/manga/manga_" + fmt.Sprintf("%04d", number) + ".txt")
 	if err != nil {
 		log.Fatal(err)
 	}

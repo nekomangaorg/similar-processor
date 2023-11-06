@@ -62,13 +62,12 @@ func getDBSimilar() []internal.DbSimilar {
 }
 
 func ExportSimilar() {
-	fmt.Printf("Exporting All Similar to csv files\n")
 	os.RemoveAll("data/similar/")
 	os.MkdirAll("data/similar/", 0777)
 	similarList := getDBSimilar()
 	for _, similar := range similarList {
-		suffix := similar.Id[0:3]
-		file, err := os.OpenFile("data/similar/"+suffix+".csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+		suffix := similar.Id[0:2]
+		file, err := os.OpenFile("data/similar/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -126,7 +125,7 @@ func ExportMangaUpdatesNewIds() {
 }
 
 func exportGeneric(fileName string, genericList []internal.DbGeneric) {
-	file, err := os.Create("data/mappings/" + fileName + ".csv")
+	file, err := os.Create("data/mappings/" + fileName + ".txt")
 	internal.CheckErr(err)
 	for _, entry := range genericList {
 		file.WriteString(entry.ID + ":::||@!@||:::" + entry.UUID + "\n")
@@ -150,7 +149,7 @@ func getAllGenericFromTable(tableName string) []internal.DbGeneric {
 }
 
 func CreateMappingsFile(fileName string) *os.File {
-	file, err := os.Create("data/mappings/" + fileName + ".csv")
+	file, err := os.Create("data/mappings/" + fileName + ".txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -158,7 +157,7 @@ func CreateMappingsFile(fileName string) *os.File {
 }
 
 func OpenMappingsFile(fileName string) *os.File {
-	file, err := os.OpenFile("data/mappings/"+fileName+".csv", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
+	file, err := os.OpenFile("data/mappings/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 	if err != nil {
 		log.Fatal(err)
 	}

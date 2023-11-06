@@ -27,13 +27,13 @@ _testmain.go
 
 # data folders
 data/*.db
-data/mappings/anilist2mdex.csv
-data/mappings/animeplanet2mdex.csv
-data/mappings/bookwalker2mdex.csv
-data/mappings/kitsu2mdex.csv
-data/mappings/novelupdates2mdex.csv
-data/mappings/myanimelist2mdex.csv
-data/mappings/mangaupdates2mdex.csv
+data/mappings/anilist2mdex.txt
+data/mappings/animeplanet2mdex.txt
+data/mappings/bookwalker2mdex.txt
+data/mappings/kitsu2mdex.txt
+data/mappings/novelupdates2mdex.txt
+data/mappings/myanimelist2mdex.txt
+data/mappings/mangaupdates2mdex.txt
 debug/*.txt
 
 

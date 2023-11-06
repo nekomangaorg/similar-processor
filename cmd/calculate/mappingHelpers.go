@@ -120,7 +120,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 				if err == nil && resp.StatusCode != 200 {
 					if resp.StatusCode == 503 {
 						//this is a bad id on Dex's side write to debug file
-						WriteLineToDebugFile("BadMUIds", uuid)
+						WriteLineToDebugFile("BadMUIds", "https://mangadex.org/title/"+uuid)
 						return false
 					} else {
 						fmt.Printf("\u001B[1;31m %s EXTERNAL MU %s: http code %d (try %d of %d)\u001B[0m\n", uuid, url, resp.StatusCode, counter, counterMax)
