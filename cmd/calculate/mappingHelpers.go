@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/similar-manga/similar/external"
 	"github.com/similar-manga/similar/internal"
 	"go.uber.org/ratelimit"
 	"io"
@@ -17,14 +16,14 @@ import (
 )
 
 func muEntryExistsInNewIDDatabase(uuid string) bool {
-	rows, err := internal.DB.Query("SELECT UUID FROM MANGAUPDATES_NEW WHERE UUID= '" + uuid + "'")
+	rows, err := internal.DB.Query("SELECT UUID FROM " + internal.TableMangaupdatesNewId + " WHERE UUID= '" + uuid + "'")
 	defer rows.Close()
 	internal.CheckErr(err)
 	return rows.Next()
 }
 
 func upsertNewMuId(uuid string, id string) {
-	_, err := internal.DB.Exec("INSERT INTO MANGAUPDATES_NEW (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
+	_, err := internal.DB.Exec("INSERT INTO "+internal.TableMangaupdatesNewId+" (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
 	internal.CheckErr(err)
 }
 
@@ -36,11 +35,11 @@ func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) {
 func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
 	if len(muLink) == 7 {
 		// Encode from base36 format
-		idEncoded := int64(external.Decode(muLink))
+		idEncoded := int64(internal.Decode(muLink))
 		base10Id := strconv.FormatInt(idEncoded, 10)
 
 		if muEntryExistsInNewIDDatabase(uuid) {
-			fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id and Already exists in database\n", index+1, total, uuid, muLink, base10Id)
+			//fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id and Already exists in database\n", index+1, total, uuid, muLink, base10Id)
 			return true
 		}
 
@@ -79,7 +78,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 		convertedId := strconv.Itoa(idOriginal)
 
 		if muEntryExistsInNewIDDatabase(uuid) {
-			fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id... but was already converted and exists in database\n", index+1, total, uuid, idOriginal)
+			//	fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id... but was already converted and exists in database\n", index+1, total, uuid, idOriginal)
 			return true
 		}
 

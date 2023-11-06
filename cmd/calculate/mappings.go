@@ -45,7 +45,7 @@ func calculateAniListMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["al"]
 		if id != "" {
-			UpsertGeneric(tx, "ANILIST", manga.Id, id)
+			UpsertGeneric(tx, internal.TableAnilist, manga.Id, id)
 		}
 	}
 	err = tx.Commit()
@@ -62,7 +62,7 @@ func calculateAnimePlanetMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["ap"]
 		if id != "" {
-			UpsertGeneric(tx, "ANIME_PLANET", manga.Id, id)
+			UpsertGeneric(tx, internal.TableAnimePlanet, manga.Id, id)
 		}
 	}
 	err = tx.Commit()
@@ -81,7 +81,7 @@ func calculateBookWalkerMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["bw"]
 		if id != "" {
-			UpsertGeneric(tx, "BOOK_WALKER", manga.Id, id)
+			UpsertGeneric(tx, internal.TableBookWalker, manga.Id, id)
 		}
 	}
 
@@ -101,7 +101,7 @@ func calculateNovelUpdatesMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["nu"]
 		if id != "" {
-			UpsertGeneric(tx, "NOVEL_UPDATES", manga.Id, id)
+			UpsertGeneric(tx, internal.TableNovelUpdates, manga.Id, id)
 		}
 	}
 
@@ -121,7 +121,7 @@ func calculateKitsuMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["kt"]
 		if id != "" {
-			UpsertGeneric(tx, "KITSU", manga.Id, id)
+			UpsertGeneric(tx, internal.TableKitsu, manga.Id, id)
 		}
 	}
 
@@ -141,7 +141,7 @@ func calculateMyAnimeListMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["mal"]
 		if id != "" {
-			UpsertGeneric(tx, "MYANIMELIST", manga.Id, id)
+			UpsertGeneric(tx, internal.TableMyanimelist, manga.Id, id)
 		}
 	}
 
@@ -161,7 +161,7 @@ func calculateMangaUpdatesMapping(mangaList []internal.Manga) {
 	for _, manga := range mangaList {
 		id := manga.Links["mu"]
 		if id != "" {
-			UpsertGeneric(tx, "MANGAUPDATES_OLD", manga.Id, id)
+			UpsertGeneric(tx, internal.TableMangaupdates, manga.Id, id)
 		}
 	}
 

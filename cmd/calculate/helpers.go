@@ -10,7 +10,7 @@ import (
 )
 
 func GetAllManga() []internal.Manga {
-	rows, err := internal.DB.Query("SELECT JSON FROM MANGA ORDER BY UUID ASC ")
+	rows, err := internal.DB.Query("SELECT JSON FROM " + internal.TableManga + " ORDER BY UUID ASC ")
 	defer rows.Close()
 	internal.CheckErr(err)
 
@@ -30,7 +30,7 @@ func GetAllManga() []internal.Manga {
 }
 
 func DeleteSimilarDB() {
-	_, err := internal.DB.Exec("DELETE FROM SIMILAR")
+	_, err := internal.DB.Exec("DELETE FROM " + internal.TableSimilar)
 	internal.CheckErr(err)
 }
 
@@ -39,7 +39,7 @@ func InsertSimilarData(similarData internal.SimilarManga) {
 	jsonSimilar, _ := json.Marshal(similarData)
 	err := json.Compact(dst, jsonSimilar)
 	internal.CheckErr(err)
-	stmt, err := internal.DB.Prepare("INSERT INTO SIMILAR (UUID, JSON) VALUES (?, ?)")
+	stmt, err := internal.DB.Prepare("INSERT INTO " + internal.TableSimilar + " (UUID, JSON) VALUES (?, ?)")
 	internal.CheckErr(err)
 	defer stmt.Close()
 	_, err = stmt.Exec(similarData.Id, dst.Bytes())
@@ -86,41 +86,41 @@ func WriteLineToDebugFile(fileName string, line string) {
 }
 
 func ExportAniList() {
-	genericList := getAllGenericFromTable("ANILIST")
+	genericList := getAllGenericFromTable(internal.TableAnilist)
 	exportGeneric("anilist2mdex", genericList)
 }
 
 func ExportAnimePlanet() {
-	genericList := getAllGenericFromTable("ANIME_PLANET")
+	genericList := getAllGenericFromTable(internal.TableAnimePlanet)
 	exportGeneric("animeplanet2mdex", genericList)
 }
 func ExportBookWalker() {
-	genericList := getAllGenericFromTable("BOOK_WALKER")
+	genericList := getAllGenericFromTable(internal.TableBookWalker)
 	exportGeneric("bookwalker2mdex", genericList)
 }
 
 func ExportMangaUpdates() {
-	genericList := getAllGenericFromTable("MANGAUPDATES_OLD")
+	genericList := getAllGenericFromTable(internal.TableMangaupdates)
 	exportGeneric("mangaupdates2mdex", genericList)
 }
 
 func ExportNovelUpdates() {
-	genericList := getAllGenericFromTable("NOVEL_UPDATES")
+	genericList := getAllGenericFromTable(internal.TableNovelUpdates)
 	exportGeneric("novelupdates2mdex", genericList)
 }
 
 func ExportKitsu() {
-	genericList := getAllGenericFromTable("KITSU")
+	genericList := getAllGenericFromTable(internal.TableKitsu)
 	exportGeneric("kitsu2mdex", genericList)
 }
 
 func ExportMyAnimeList() {
-	genericList := getAllGenericFromTable("MYANIMELIST")
+	genericList := getAllGenericFromTable(internal.TableMyanimelist)
 	exportGeneric("myanimelist2mdex", genericList)
 }
 
 func ExportMangaUpdatesNewIds() {
-	genericList := getAllGenericFromTable("MANGAUPDATES_NEW")
+	genericList := getAllGenericFromTable(internal.TableMangaupdatesNewId)
 	exportGeneric("mangaupdates_new2mdex", genericList)
 }
 
@@ -150,14 +150,6 @@ func getAllGenericFromTable(tableName string) []internal.DbGeneric {
 
 func CreateMappingsFile(fileName string) *os.File {
 	file, err := os.Create("data/mappings/" + fileName + ".txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return file
-}
-
-func OpenMappingsFile(fileName string) *os.File {
-	file, err := os.OpenFile("data/mappings/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 	if err != nil {
 		log.Fatal(err)
 	}

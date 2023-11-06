@@ -5,6 +5,17 @@ import (
 	"log"
 )
 
+const TableMangaupdates = "MANGAUPDATES_OLD"
+const TableMangaupdatesNewId = "MANGAUPDATES_NEW"
+const TableAnilist = "ANILIST"
+const TableMyanimelist = "MYANIMELIST"
+const TableManga = "MANGA"
+const TableSimilar = "SIMILAR"
+const TableNovelUpdates = "NOVEL_UPDATES"
+const TableKitsu = "KITSU"
+const TableBookWalker = "BOOK_WALKER"
+const TableAnimePlanet = "ANIME_PLANET"
+
 var DB *sql.DB
 
 func ConnectDB() {

@@ -23,7 +23,7 @@ type MangaApiGetSearchMangaOpts struct {
 	UpdatedAtSince optional.String
 }
 
-func (a *MangaApiService) GetSearchManga2(ctx context.Context, localVarOptionals *MangaApiGetSearchMangaOpts) (MangaList, *http.Response, error) {
+func (a *MangaApiService) GetSearchManga(ctx context.Context, localVarOptionals *MangaApiGetSearchMangaOpts) (MangaList, *http.Response, error) {
 	var (
 		localVarHttpMethod  = strings.ToUpper("Get")
 		localVarPostBody    interface{}

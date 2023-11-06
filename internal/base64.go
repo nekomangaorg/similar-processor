@@ -1,4 +1,4 @@
-package external
+package internal
 
 /*
 Base36 implementation in golang
@@ -26,11 +26,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
-import (
-	"math/big"
-	"strings"
-)
 
 var (
 	base36 = []byte{
@@ -93,21 +88,6 @@ var (
 	}
 )
 
-// Encode encodes a number to base36.
-func Encode(value uint64) string {
-	var res [16]byte
-	var i int
-	for i = len(res) - 1; ; i-- {
-		res[i] = base36[value%36]
-		value /= 36
-		if value == 0 {
-			break
-		}
-	}
-
-	return string(res[i:])
-}
-
 // Decode decodes a base36-encoded string.
 func Decode(s string) uint64 {
 	if len(s) > 13 {
@@ -120,75 +100,4 @@ func Decode(s string) uint64 {
 		res += uint8Index[c] * pow36Index[idx]
 	}
 	return res
-}
-
-var bigRadix = big.NewInt(36)
-var bigZero = big.NewInt(0)
-
-// EncodeBytesAsBytes encodes a byte slice to base36.
-func EncodeBytesAsBytes(b []byte) []byte {
-	x := new(big.Int)
-	x.SetBytes(b)
-
-	answer := make([]byte, 0, len(b)*136/100)
-	for x.Cmp(bigZero) > 0 {
-		mod := new(big.Int)
-		x.DivMod(x, bigRadix, mod)
-		answer = append(answer, base36[mod.Int64()])
-	}
-
-	// leading zero bytes
-	for _, i := range b {
-		if i != 0 {
-			break
-		}
-		answer = append(answer, base36[0])
-	}
-
-	// reverse
-	alen := len(answer)
-	for i := 0; i < alen/2; i++ {
-		answer[i], answer[alen-1-i] = answer[alen-1-i], answer[i]
-	}
-
-	return answer
-}
-
-// EncodeBytes encodes a byte slice to base36 string.
-func EncodeBytes(b []byte) string {
-	return string(EncodeBytesAsBytes(b))
-}
-
-// DecodeToBytes decodes a base36 string to a byte slice, using alphabet.
-func DecodeToBytes(b string) []byte {
-	alphabet := string(base36)
-	answer := big.NewInt(0)
-	j := big.NewInt(1)
-
-	for i := len(b) - 1; i >= 0; i-- {
-		tmp := strings.IndexAny(alphabet, string(b[i]))
-		if tmp == -1 {
-			return []byte("")
-		}
-		idx := big.NewInt(int64(tmp))
-		tmp1 := big.NewInt(0)
-		tmp1.Mul(j, idx)
-
-		answer.Add(answer, tmp1)
-		j.Mul(j, bigRadix)
-	}
-
-	tmpval := answer.Bytes()
-
-	var numZeros int
-	for numZeros = 0; numZeros < len(b); numZeros++ {
-		if b[numZeros] != alphabet[0] {
-			break
-		}
-	}
-	flen := numZeros + len(tmpval)
-	val := make([]byte, flen, flen)
-	copy(val[numZeros:], tmpval)
-
-	return val
 }

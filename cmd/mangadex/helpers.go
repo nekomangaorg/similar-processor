@@ -70,7 +70,7 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 
 	for retryCount := 0; retryCount <= maxRetries && err != nil; retryCount++ {
 		rateLimiter.Take()
-		mangaList, resp, err = client.MangaApi.GetSearchManga2(ctx, &opts)
+		mangaList, resp, err = client.MangaApi.GetSearchManga(ctx, &opts)
 		if err != nil {
 			fmt.Printf("\u001B[1;31mMANGA ERROR (%d of %d): Status Code %v : %v\u001B[0m\n", retryCount, maxRetries, resp.StatusCode, err)
 			if err.Error() == "undefined response type text/html; charset=utf-8" {
@@ -101,7 +101,7 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 }
 
 func ExistsInDatabase(uuid string) bool {
-	rows, err := internal.DB.Query("SELECT UUID FROM MANGA WHERE UUID= '" + uuid + "'")
+	rows, err := internal.DB.Query("SELECT UUID FROM " + internal.TableManga + " WHERE UUID= '" + uuid + "'")
 	defer rows.Close()
 	internal.CheckErr(err)
 	return rows.Next()
@@ -109,12 +109,12 @@ func ExistsInDatabase(uuid string) bool {
 
 func UpsertManga(apiManga mangadex.Manga) {
 	jsonManga := ApiMangaToJson(apiManga)
-	_, err := internal.DB.Exec("INSERT INTO MANGA (UUID, JSON) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", apiManga.Id, jsonManga)
+	_, err := internal.DB.Exec("INSERT INTO "+internal.TableManga+" (UUID, JSON) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", apiManga.Id, jsonManga)
 	internal.CheckErr(err)
 }
 
 func getDBManga() []internal.DbManga {
-	rows, err := internal.DB.Query("SELECT UUID, JSON FROM MANGA ORDER BY UUID ASC")
+	rows, err := internal.DB.Query("SELECT UUID, JSON FROM " + internal.TableManga + " ORDER BY UUID ASC")
 	defer rows.Close()
 	internal.CheckErr(err)
 
