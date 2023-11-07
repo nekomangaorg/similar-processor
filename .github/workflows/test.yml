@@ -42,9 +42,9 @@ jobs:
 
       - name: cp similar files
         run: |
-          ls
           cd similar-data
-          cp ../similar/data/similar/ similar
+          ls
+          cp ../data/similar/ similar
 
       - name: Create PR for Similar data
         uses: peter-evans/create-pull-request@v5
