@@ -1,4 +1,4 @@
-name: build
+name: Add And Update Metadata
 on:
   workflow_dispatch:
   schedule:

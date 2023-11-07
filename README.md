@@ -3,33 +3,24 @@
 This repo has both the scraping and matching utilities to find mangas which are close in content to others. The idea is
 to create a recommendation system outside MangaDex since there isn't one and thus allow for users to discover other
 content. Right now it is pretty rudimentary, but seems to give ok results most of the time. If you want to use it,
-please download [Neko](https://github.com/CarlosEsco/Neko) and enable recommendations inside the app or use
+please download [Neko](https://github.com/CarlosEsco/Neko) or use
 the [Chrome Extension](https://chrome.google.com/webstore/detail/mangadex-similar-manga/ghjofcifjnbpgfjbbnbeeipjlhnmbefl).
 
 
 ## Setup / Dependencies
 
-Client was generated using [swagger](https://editor.swagger.io/). You will need to setup
+Client was generated using then tweaked to remove excess [swagger](https://editor.swagger.io/). You will need to setup
 a [golang workspace](https://golang.org/doc/install), and then run the following commands. Only manga need to be
 downloaded / scraped from mangadex to be able to perform similar manga identification.
 
 ```
-go get -u github.com/spf13/cobra@latest
-go get golang.org/x/oauth2
-go get github.com/antihax/optional
-go get github.com/james-bowman/nlp
-go get github.com/caneroj1/stemmer
-go get github.com/PuerkitoBio/goquery
+go get .
+go build
 ```
 
 ## Runtime Instructions
-
-
-1. Run `./1_cache_mangas` to get local list of all mangas on the site (28 hours for 73k manga)
-3. Run `./2_calc_similar` to generate similarity index between manga (6 hours)
-4. Run `./3_calc_mappings` to export external ID to mangadex UUID mapping files (2 minutes)
-4. Run `./4_calc_mu_ids` convert MangaUpdate ids into uniform "new" ids for their new api (27 hours)
-5. Run `python utils/create_sqlite.py` to generate mapping file for [Neko](https://github.com/CarlosEsco/Neko/tree/master/app/src/main/assets)
+The application uses cobra for flags cli processing.
+running `./similar` will give you a list of commands.
 
 
 ## Manga Links Data

@@ -19,7 +19,7 @@ var RootCmd = &cobra.Command{
  3. ./similar calculate mappings
  4. ./similar calculate similar
  
- After all the files you can generate the neko mapping db also.
+ After all the files you can generate the neko mapping db using
   ./similar neko
 
  If you are running again after a while make sure you pull the latest from git, then rerun from scratch as the manga mappings and 
