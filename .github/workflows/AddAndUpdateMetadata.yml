@@ -37,6 +37,9 @@ jobs:
       - name: Update mappings
         run: ./similar calculate mappings
 
+      - name: Calculate similars
+        run: ./similar calculate mappings
+
       - name: Create PR for Manga metadata changes
         uses: peter-evans/create-pull-request@v5
         with:
