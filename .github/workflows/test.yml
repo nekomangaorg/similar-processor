@@ -29,6 +29,9 @@ jobs:
       - name: Run Add new Manga
         run: ./similar mangadex add
 
+      - name: Calculate similar
+        run: ./similar calculate similar
+
       - name: switch directories
         run: |
           cd ..
