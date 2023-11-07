@@ -38,16 +38,18 @@ jobs:
       - name: switch directories
         run: |
           cd ..
+          ls
 
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
           name: CarlosEsco/data
+          refs: update
 
       - name: cp similar files
         run: |
+          ls
           cd data
-          git checkout update
           cp ../similar/data/similar/ similar
 
       - name: Create PR for Similar data
