@@ -88,7 +88,7 @@ func calculateSimilars(debugMode bool, skippedMode bool) {
 		DeleteSimilarDB()
 	}
 
-	mangaList := GetAllManga()
+	mangaList := internal.GetAllManga()
 
 	fmt.Println("Begin loading into corpus")
 

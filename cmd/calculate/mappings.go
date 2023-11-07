@@ -23,7 +23,7 @@ func init() {
 func runMappings(cmd *cobra.Command, args []string) {
 	initialStart := time.Now()
 
-	mangaList := GetAllManga()
+	mangaList := internal.GetAllManga()
 
 	calculateAniListMapping(mangaList)
 	calculateAnimePlanetMapping(mangaList)

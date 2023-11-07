@@ -3,31 +3,10 @@ package calculate
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/similar-manga/similar/internal"
 	"log"
 	"os"
 )
-
-func GetAllManga() []internal.Manga {
-	rows, err := internal.DB.Query("SELECT JSON FROM " + internal.TableManga + " ORDER BY UUID ASC ")
-	defer rows.Close()
-	internal.CheckErr(err)
-
-	var mangaList []internal.Manga
-	for rows.Next() {
-		manga := internal.Manga{}
-		var jsonManga []byte
-		rows.Scan(&jsonManga)
-		err := json.Unmarshal(jsonManga, &manga)
-		if err != nil {
-			fmt.Printf(string(jsonManga))
-		}
-		internal.CheckErr(err)
-		mangaList = append(mangaList, manga)
-	}
-	return mangaList
-}
 
 func DeleteSimilarDB() {
 	_, err := internal.DB.Exec("DELETE FROM " + internal.TableSimilar)

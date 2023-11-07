@@ -29,4 +29,5 @@ func Execute() {
 
 func init() {
 	internal.ConnectDB()
+
 }
