@@ -29,12 +29,6 @@ jobs:
       - name: Run Add new Manga
         run: ./similar mangadex add
 
-      - name: Update manga metadata since last run
-        run: ./similar mangadex metadata
-
-      - name: Update mappings
-        run: ./similar calculate mappings
-
       - name: switch directories
         run: |
           cd ..
