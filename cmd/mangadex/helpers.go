@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -109,7 +110,8 @@ func ExistsInDatabase(uuid string) bool {
 
 func UpsertManga(apiManga mangadex.Manga) {
 	jsonManga := ApiMangaToJson(apiManga)
-	_, err := internal.DB.Exec("INSERT INTO "+internal.TableManga+" (UUID, JSON) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", apiManga.Id, jsonManga)
+	currentDate := strings.Split(time.Now().UTC().Format(time.RFC3339), "Z")[0]
+	_, err := internal.DB.Exec("INSERT INTO "+internal.TableManga+" (UUID, JSON, DATE) VALUES (?, ?, ?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", apiManga.Id, jsonManga, currentDate)
 	internal.CheckErr(err)
 }
 
