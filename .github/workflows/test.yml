@@ -42,6 +42,7 @@ jobs:
 
       - name: cp similar files
         run: |
+          ls
           cd similar-data
           ls
           cp ../data/similar/ similar
