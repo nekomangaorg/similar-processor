@@ -13,10 +13,9 @@ import (
 
 var nekoCmd = &cobra.Command{
 	Use:   "neko",
-	Short: "neko command",
-	Long: `
-Generate the neko mapping.db`,
-	Run: runNeko,
+	Short: "Generate a neko mapping database",
+	Long:  `Generate the neko mapping database file`,
+	Run:   runNeko,
 }
 
 func init() {

@@ -11,8 +11,8 @@ import (
 
 var mappingsCmd = &cobra.Command{
 	Use:   "mappings",
-	Short: "This updates the similar calculations",
-	Long:  `\nCalculate the mapping files`,
+	Short: "This updates the external website mapping ids to MangaDex uuids",
+	Long:  "This updates the external website mapping ids to MangaDex uuids",
 	Run:   runMappings,
 }
 

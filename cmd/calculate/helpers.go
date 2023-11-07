@@ -40,22 +40,6 @@ func getDBSimilar() []internal.DbSimilar {
 	return similarList
 }
 
-func ExportSimilar() {
-	os.RemoveAll("data/similar/")
-	os.MkdirAll("data/similar/", 0777)
-	similarList := getDBSimilar()
-	for _, similar := range similarList {
-		suffix := similar.Id[0:2]
-		file, err := os.OpenFile("data/similar/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
-		if err != nil {
-			log.Fatal(err)
-		}
-		file.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
-		file.Close()
-
-	}
-}
-
 func WriteLineToDebugFile(fileName string, line string) {
 	os.MkdirAll("debug", 0777)
 	file, err := os.OpenFile("debug/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)

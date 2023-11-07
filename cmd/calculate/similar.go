@@ -13,6 +13,7 @@ import (
 	"gonum.org/v1/gonum/mat"
 	"log"
 	"math"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -30,9 +31,9 @@ var similarCmd = &cobra.Command{
 
 func init() {
 	calculateCmd.AddCommand(similarCmd)
-	calculateCmd.PersistentFlags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
-	calculateCmd.PersistentFlags().BoolP("debug", "d", false, "Run a set of `debug` entries only.  Printing results to the screen only.")
-	calculateCmd.PersistentFlags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
+	similarCmd.Flags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
+	similarCmd.Flags().BoolP("debug", "d", false, "Run a set of debug entries only.  Printing results to the screen only.")
+	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
 
 }
 func runSimilar(cmd *cobra.Command, args []string) {
@@ -49,7 +50,7 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	if !debugMode {
 		startProcessing := time.Now()
 		fmt.Printf("Exporting All Similar to txt files\n")
-		ExportSimilar()
+		exportSimilar()
 		fmt.Printf("Exporting simularities took %s\n\n", time.Since(startProcessing))
 
 	}
@@ -436,4 +437,22 @@ type customMatch struct {
 	Distance     float64
 	DistanceTag  float64
 	DistanceDesc float64
+}
+
+func exportSimilar() {
+	os.RemoveAll("data/similar/")
+	os.MkdirAll("data/similar/", 0777)
+	similarList := getDBSimilar()
+	for _, similar := range similarList {
+		folder := similar.Id[0:2]
+		suffix := similar.Id[0:3]
+		os.Mkdir("data/similar/"+folder, 0777)
+		file, err := os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+		if err != nil {
+			log.Fatal(err)
+		}
+		file.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
+		file.Close()
+
+	}
 }

@@ -15,8 +15,8 @@ import (
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "init command",
-	Long:  `Initializes the database with the stored data to speed up processing.`,
+	Short: "Initialize the database data",
+	Long:  `Initializes the database with the stored data in the repository`,
 	Run:   runInit,
 }
 

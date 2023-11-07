@@ -25,8 +25,8 @@ var metadataCmd = &cobra.Command{
 
 func init() {
 	mangadexCmd.AddCommand(metadataCmd)
-	metadataCmd.PersistentFlags().BoolP("all", "a", false, "queries and updates the entire database")
-	metadataCmd.PersistentFlags().StringP("id", "i", "", "update metadata for a specific uuid in the database")
+	metadataCmd.Flags().BoolP("all", "a", false, "queries and updates the entire database")
+	metadataCmd.Flags().StringP("id", "i", "", "update metadata for a specific uuid in the database")
 
 }
 
