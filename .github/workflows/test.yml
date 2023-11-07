@@ -38,11 +38,12 @@ jobs:
         with:
           repository: CarlosEsco/data
           refs: update
+          path: similar-data
 
       - name: cp similar files
         run: |
           ls
-          cd data
+          cd similar-data
           cp ../similar/data/similar/ similar
 
       - name: Create PR for Similar data
