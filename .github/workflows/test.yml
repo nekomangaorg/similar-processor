@@ -1,8 +1,6 @@
-name: Add And Update Metadata
+name: test
 on:
   workflow_dispatch:
-  schedule:
-    - cron:  "0 0 * * 1/4"
 jobs:
 
   build:
@@ -37,32 +35,20 @@ jobs:
       - name: Update mappings
         run: ./similar calculate mappings
 
-      - name: Calculate similar
-        run: ./similar calculate similar
-
-      - name: Create PR for Manga metadata changes
-        uses: peter-evans/create-pull-request@v5
-        with:
-          add-paths: |
-            data/manga/*
-            data/mappings/*
-            data/last_metadata_update.txt
-          commit-message: Update Manga metadata and MU mapping
-          branch: auto-update
-          title: Update Manga metadata and MU mapping
-          delete-branch: true
+      - name: switch directories
+        run: |
+          cd ..
 
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
           name: CarlosEsco/data
 
-      - name: Check out similar repository
+      - name: cp similar files
         run: |
-          git clone git@github.com:CarlosEsco/data.git similar-data
-          cd similar-data
+          cd data
           git checkout update
-          cp ../data/similar/ similar
+          cp ../similar/data/similar/ similar
 
       - name: Create PR for Similar data
         uses: peter-evans/create-pull-request@v5
@@ -75,5 +61,5 @@ jobs:
           delete-branch: true
 
 
-    
+
 
