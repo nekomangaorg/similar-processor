@@ -6,7 +6,7 @@ on:
 jobs:
 
   build:
-    name: Build
+    name: Process
     runs-on: ubuntu-latest
     steps:
 
