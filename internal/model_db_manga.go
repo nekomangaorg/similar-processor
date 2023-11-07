@@ -7,4 +7,5 @@ import (
 type DbManga struct {
 	Id   string
 	JSON string
+	DATE string
 }

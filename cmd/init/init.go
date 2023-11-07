@@ -107,7 +107,7 @@ func openFileAndProcess(fileInfo os.DirEntry) {
 	for scanner.Scan() {
 		split := strings.Split(scanner.Text(), ":::||@!@||:::")
 		if len(split) > 0 {
-			_, err := tx.Exec("INSERT INTO MANGA(UUID, JSON) VALUES (?,?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", split[0], split[1])
+			_, err := tx.Exec("INSERT INTO MANGA(UUID, DATE, JSON) VALUES (?,?,?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON", split[0], split[1], split[2])
 			internal.CheckErr(err)
 		}
 	}

@@ -114,14 +114,14 @@ func UpsertManga(apiManga mangadex.Manga) {
 }
 
 func getDBManga() []internal.DbManga {
-	rows, err := internal.DB.Query("SELECT UUID, JSON FROM " + internal.TableManga + " ORDER BY UUID ASC")
+	rows, err := internal.DB.Query("SELECT UUID, JSON, DATE FROM " + internal.TableManga + " ORDER BY DATE ASC")
 	defer rows.Close()
 	internal.CheckErr(err)
 
 	var mangaList []internal.DbManga
 	for rows.Next() {
 		manga := internal.DbManga{}
-		rows.Scan(&manga.Id, &manga.JSON)
+		rows.Scan(&manga.Id, &manga.JSON, &manga.DATE)
 		internal.CheckErr(err)
 		mangaList = append(mangaList, manga)
 	}
@@ -142,7 +142,7 @@ func ExportManga() {
 			file = createMangaFile(suffix)
 		}
 
-		file.WriteString(manga.Id + ":::||@!@||:::" + manga.JSON + "\n")
+		file.WriteString(manga.Id + ":::||@!@||:::" + manga.DATE + ":::||@!@||:::" + manga.JSON + "\n")
 
 	}
 
