@@ -38,12 +38,11 @@ jobs:
       - name: switch directories
         run: |
           cd ..
-          ls
 
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
-          name: CarlosEsco/data
+          repository: CarlosEsco/data
           refs: update
 
       - name: cp similar files
