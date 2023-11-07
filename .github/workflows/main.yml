@@ -1,5 +1,7 @@
 name: build
-on: [ push ]
+on:
+  schedule:
+    - cron:  "0 0 * * 1/4"
 jobs:
 
   build:
@@ -14,7 +16,9 @@ jobs:
         id: go
 
       - name: Checkout Codebase
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
+        with:
+          token: GITHUB_TOKEN
 
       - name: Setup Dependencies
         run: go get .
@@ -22,5 +26,27 @@ jobs:
       - name: Build
         run: go build -v
 
-      - name: Init
-        run: similar init
+      - name: Setup DB
+        run: ./similar init
+
+      - name: Run Add new Manga
+        run: ./similar mangadex add
+
+      - name: Update manga metadata since last run
+        run: ./similar mangadex metadata
+
+      #  - name: Update mappings
+       #run: ./similar calculate mappings
+
+      - name: Create PR for Manga metadata changes
+        uses: peter-evans/create-pull-request@v5
+        with:
+          add-paths: |
+            data/manga/*
+            data/mappings/*
+            data/last_metadata_update.txt
+          commit-message: Update Manga metadata and MU mapping
+          branch: auto-update
+          title: Update Manga metadata and MU mapping
+          delete-branch: true
+
