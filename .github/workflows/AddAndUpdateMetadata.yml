@@ -49,3 +49,23 @@ jobs:
           title: Update Manga metadata and MU mapping
           delete-branch: true
 
+      - name: Check out similar repository
+        run: |
+          git clone git@github.com:CarlosEsco/data.git similar-data
+          cd similar-data
+          git checkout update
+          cp ../data/similar/ similar
+
+      - name: Create PR for Similar data
+        uses: peter-evans/create-pull-request@v5
+        with:
+          add-paths: |
+            data/similar/*
+          commit-message: Update Similar Mappings
+          branch: auto-update
+          title: Update Similar Mappings
+          delete-branch: true
+
+
+    
+
