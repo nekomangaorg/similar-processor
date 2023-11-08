@@ -222,7 +222,7 @@ func calculateSimilars(debugMode bool, skippedMode bool) {
 	// https://downey.io/notes/dev/openmp-parallel-for-in-golang/
 	var wg sync.WaitGroup
 	wg.Add(len(mangaList))
-	maxGoroutines := 1000
+	maxGoroutines := 500
 	guard := make(chan struct{}, maxGoroutines)
 
 	//	// For each manga we will get the top calculate for tags and description
