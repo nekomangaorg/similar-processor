@@ -63,7 +63,7 @@ jobs:
       - name: cp similar results to similar-data
         run: |
           cd similar-data
-          cp -r ../data/similar/ similar
+          cp -r ../data/similar/ .
 
 
       - name: Create PR for Similar data
