@@ -29,12 +29,6 @@ jobs:
       - name: Run Add new Manga
         run: ./similar mangadex add
 
-      - name: "check is MY_SECRET exists"
-        env:
-            super_secret: ${{ secrets.PAT }}
-        if: ${{ env.super_secret == '' }}
-        run: 'echo "echo the secret \"PAT\" has not been made; echo please go to \"settings \> secrets \> actions\" to create it"
-
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
