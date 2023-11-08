@@ -32,7 +32,7 @@ jobs:
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
-          token: test
+          token: ${{ secrets.PAT }}
           repository: CarlosEsco/data
           ref: update
           path: similar-data
