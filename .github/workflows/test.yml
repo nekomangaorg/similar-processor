@@ -32,10 +32,10 @@ jobs:
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.PAT }}
           repository: CarlosEsco/data
           ref: update
           path: similar-data
-          token: ${{ secrets.GIT_TOKEN }}
 
       - name: cp similar files
         run: |
@@ -45,13 +45,13 @@ jobs:
       - name: Create PR for Similar data
         uses: peter-evans/create-pull-request@v5
         with:
+          token: ${{ secrets.PAT }}
           add-paths: |
             data/similar/*
           commit-message: Update Similar Mappings
           branch: auto-update
           title: Update Similar Mappings
           delete-branch: true
-          token: ${{ secrets.GIT_TOKEN }}
 
 
 
