@@ -34,7 +34,7 @@ func init() {
 	similarCmd.Flags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
 	similarCmd.Flags().BoolP("debug", "d", false, "Run a set of debug entries only.  Printing results to the screen only.")
 	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
-
+	similarCmd.Flags().IntP("threads", "t", 1000, "Change the batch processing amount")
 }
 func runSimilar(cmd *cobra.Command, args []string) {
 
@@ -222,7 +222,7 @@ func calculateSimilars(debugMode bool, skippedMode bool) {
 	// https://downey.io/notes/dev/openmp-parallel-for-in-golang/
 	var wg sync.WaitGroup
 	wg.Add(len(mangaList))
-	maxGoroutines := 500
+	maxGoroutines := 1000
 	guard := make(chan struct{}, maxGoroutines)
 
 	//	// For each manga we will get the top calculate for tags and description

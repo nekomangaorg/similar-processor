@@ -29,24 +29,18 @@ jobs:
       - name: Run Add new Manga
         run: ./similar mangadex add
 
-      - name: Calculate similar
-        run: ./similar calculate similar
-
-      - name: switch directories
-        run: |
-          cd ..
-
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
           repository: CarlosEsco/data
-          refs: update
+          ref: update
           path: similar-data
+          token: ${{ secrets.GIT_TOKEN }}
 
       - name: cp similar files
         run: |
           cd similar-data
-          cp -r ../data/similar/ similar
+          touch data/similar/00/test.txt
 
       - name: Create PR for Similar data
         uses: peter-evans/create-pull-request@v5
@@ -57,6 +51,7 @@ jobs:
           branch: auto-update
           title: Update Similar Mappings
           delete-branch: true
+          token: ${{ secrets.GIT_TOKEN }}
 
 
 

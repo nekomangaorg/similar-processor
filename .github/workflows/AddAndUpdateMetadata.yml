@@ -38,7 +38,7 @@ jobs:
         run: ./similar calculate mappings
 
       - name: Calculate similar
-        run: ./similar calculate similar
+        run: ./similar calculate similar -t=500
 
       - name: Create PR for Manga metadata changes
         uses: peter-evans/create-pull-request@v5
@@ -52,27 +52,21 @@ jobs:
           title: Update Manga metadata and MU mapping
           delete-branch: true
 
+      - name: switch directories
+        run: |
+          cd ..
+
       - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
-          name: CarlosEsco/data
+          repository: CarlosEsco/data
+          ref: update
+          path: similar-data
 
-      - name: Check out similar repository
+      - name: cp similar files
         run: |
-          git clone git@github.com:CarlosEsco/data.git similar-data
           cd similar-data
-          git checkout update
-          cp ../data/similar/ similar
-
-      - name: Create PR for Similar data
-        uses: peter-evans/create-pull-request@v5
-        with:
-          add-paths: |
-            data/similar/*
-          commit-message: Update Similar Mappings
-          branch: auto-update
-          title: Update Similar Mappings
-          delete-branch: true
+          cp -r ../data/similar/ similar
 
 
     
