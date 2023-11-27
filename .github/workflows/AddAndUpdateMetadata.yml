@@ -50,7 +50,7 @@ jobs:
           delete-branch: true
 
       - name: Calculate similar
-        run: ./similar calculate similar -t=100
+        run: ./similar calculate similar -t=50
 
       - name: Checkout similar data
         uses: actions/checkout@v4
