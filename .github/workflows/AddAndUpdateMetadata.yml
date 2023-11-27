@@ -50,14 +50,14 @@ jobs:
           delete-branch: true
 
       - name: Calculate similar
-        run: ./similar calculate similar -t=500
+        run: ./similar calculate similar -t=100
 
       - name: Checkout similar data
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT }}
-          repository: CarlosEsco/data
-          ref: update
+          repository: nekomangaorg/similar-data
+          ref: main
           path: similar-data
 
       - name: cp similar results to similar-data

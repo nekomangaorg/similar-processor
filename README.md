@@ -2,9 +2,11 @@
 
 This repo has both the scraping and matching utilities to find mangas which are close in content to others. The idea is
 to create a recommendation system outside MangaDex since there isn't one and thus allow for users to discover other
-content. Right now it is pretty rudimentary, but seems to give ok results most of the time. If you want to use it,
-please download [Neko](https://github.com/CarlosEsco/Neko) or use
-the [Chrome Extension](https://chrome.google.com/webstore/detail/mangadex-similar-manga/ghjofcifjnbpgfjbbnbeeipjlhnmbefl).
+content. 
+
+This is a fork of https://github.com/similar-manga/similar with the primary changes being optimizations for processing and
+scraping to run this in a github workflow.
+
 
 
 ## Setup / Dependencies
