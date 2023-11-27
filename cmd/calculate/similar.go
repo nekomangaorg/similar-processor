@@ -41,10 +41,11 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	debugMode, _ := cmd.Flags().GetBool("debug")
 	skippedMode, _ := cmd.Flags().GetBool("skipped")
 	exportOnly, _ := cmd.Flags().GetBool("export")
+	threads, _ := cmd.Flags().GetInt("threads")
 
 	if !exportOnly {
 		fmt.Printf("\nBegin calculating similars\n")
-		calculateSimilars(debugMode, skippedMode)
+		calculateSimilars(debugMode, skippedMode, threads)
 	}
 
 	if !debugMode {
@@ -57,7 +58,7 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 }
 
-func calculateSimilars(debugMode bool, skippedMode bool) {
+func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 	startProcessing := time.Now()
 
 	// Settings
@@ -222,7 +223,7 @@ func calculateSimilars(debugMode bool, skippedMode bool) {
 	// https://downey.io/notes/dev/openmp-parallel-for-in-golang/
 	var wg sync.WaitGroup
 	wg.Add(len(mangaList))
-	maxGoroutines := 1000
+	maxGoroutines := threads
 	guard := make(chan struct{}, maxGoroutines)
 
 	//	// For each manga we will get the top calculate for tags and description
