@@ -62,7 +62,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 	startProcessing := time.Now()
 
 	// Settings
-	numSimToGet := 40
+	numSimToGet := 20
 	tagScoreRatio := 0.40
 	ignoreDescScoreUnder := 0.01
 	acceptDescScoreOver := 0.45
