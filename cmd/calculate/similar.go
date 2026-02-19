@@ -84,7 +84,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 		for k := range debugMangaIds {
 			fmt.Printf("  - %s\n", k)
 		}
-		fmt.Println("\n")
+		fmt.Println()
 
 	} else {
 		DeleteSimilarDB()
@@ -440,20 +440,43 @@ type customMatch struct {
 	DistanceDesc float64
 }
 
+// exportSimilar writes all similar manga data to individual files in data/similar/.
+// It optimizes file I/O by grouping writes to the same file (based on UUID prefix),
+// which reduces syscalls significantly when similarList is sorted by UUID.
 func exportSimilar() {
 	os.RemoveAll("data/similar/")
 	os.MkdirAll("data/similar/", 0777)
 	similarList := getDBSimilar()
+
+	var currentFile *os.File
+	var currentSuffix string
+	var currentFolder string
+
 	for _, similar := range similarList {
 		folder := similar.Id[0:2]
 		suffix := similar.Id[0:3]
-		os.Mkdir("data/similar/"+folder, 0777)
-		file, err := os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
-		if err != nil {
-			log.Fatal(err)
-		}
-		file.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
-		file.Close()
 
+		if suffix != currentSuffix {
+			if currentFile != nil {
+				currentFile.Close()
+			}
+
+			if folder != currentFolder {
+				os.Mkdir("data/similar/"+folder, 0777)
+				currentFolder = folder
+			}
+
+			var err error
+			currentFile, err = os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+			if err != nil {
+				log.Fatal(err)
+			}
+			currentSuffix = suffix
+		}
+
+		currentFile.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
+	}
+	if currentFile != nil {
+		currentFile.Close()
 	}
 }
