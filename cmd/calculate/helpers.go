@@ -41,8 +41,8 @@ func getDBSimilar() []internal.DbSimilar {
 }
 
 func WriteLineToDebugFile(fileName string, line string) {
-	os.MkdirAll("debug", 0777)
-	file, err := os.OpenFile("debug/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+	os.MkdirAll("debug", 0755)
+	file, err := os.OpenFile("debug/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	internal.CheckErr(err)
 	file.WriteString(line + "\n")
 	file.Close()

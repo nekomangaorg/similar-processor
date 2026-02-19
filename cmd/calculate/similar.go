@@ -442,13 +442,13 @@ type customMatch struct {
 
 func exportSimilar() {
 	os.RemoveAll("data/similar/")
-	os.MkdirAll("data/similar/", 0777)
+	os.MkdirAll("data/similar/", 0755)
 	similarList := getDBSimilar()
 	for _, similar := range similarList {
 		folder := similar.Id[0:2]
 		suffix := similar.Id[0:3]
-		os.Mkdir("data/similar/"+folder, 0777)
-		file, err := os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+		os.Mkdir("data/similar/"+folder, 0755)
+		file, err := os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal(err)
 		}

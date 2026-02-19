@@ -118,7 +118,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 
 	}
 
-	metadataFile, err := os.OpenFile("data/last_metadata_update.txt", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	metadataFile, err := os.OpenFile("data/last_metadata_update.txt", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	internal.CheckErr(err)
 	_, err = metadataFile.WriteString(strings.Split(time.Now().UTC().Format(time.RFC3339), "Z")[0])
 	internal.CheckErr(err)
