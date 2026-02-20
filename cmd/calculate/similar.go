@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"container/heap"
 	"fmt"
 	"github.com/caneroj1/stemmer"
 	"github.com/james-bowman/nlp"
@@ -296,6 +297,11 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 
 			// Perform matching to all the other vectors
 			var matches []customMatch
+			h := &MatchMinHeap{}
+			if !skippedMode {
+				heap.Init(h)
+			}
+
 			for mangaMatchCheckIndex := 0; mangaMatchCheckIndex < len(mangaList); mangaMatchCheckIndex++ {
 				// Optimization: Skip self-match
 				if mangaMatchCheckIndex == currentMangaIndex {
@@ -332,23 +338,46 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 				match.DistanceTag = distTag
 				match.DistanceDesc = distDesc
 
-				// Optimization: Skip appending if score is invalid and we are not in skippedMode.
-				// This reduces slice growth and sorting cost significantly.
-				if !skippedMode && match.Distance <= 0 {
-					continue
+				if !skippedMode {
+					// Optimization: Use a heap to track top matches instead of sorting everything
+					if match.Distance <= 0 {
+						continue
+					}
+
+					if h.Len() < NumSimToGet {
+						// Only check validity if it's a candidate
+						if invalid, _ := invalidForProcessing(match, currentMangaIndex, currentManga, mangaList[match.ID]); !invalid {
+							heap.Push(h, match)
+						}
+					} else if match.Distance > (*h)[0].Distance {
+						// If better than the worst in heap, check validity and maybe swap
+						if invalid, _ := invalidForProcessing(match, currentMangaIndex, currentManga, mangaList[match.ID]); !invalid {
+							heap.Pop(h)
+							heap.Push(h, match)
+						}
+					}
+				} else {
+					// Original logic for skippedMode
+					matches = append(matches, match)
 				}
-
-				matches = append(matches, match)
-
 			}
-			slices.SortFunc(matches, func(a, b customMatch) int {
-				if a.Distance > b.Distance {
-					return -1
-				} else if a.Distance < b.Distance {
-					return 1
+
+			if !skippedMode {
+				// Convert heap to sorted slice (descending)
+				matches = make([]customMatch, h.Len())
+				for i := h.Len() - 1; i >= 0; i-- {
+					matches[i] = heap.Pop(h).(customMatch)
 				}
-				return 0
-			})
+			} else {
+				slices.SortFunc(matches, func(a, b customMatch) int {
+					if a.Distance > b.Distance {
+						return -1
+					} else if a.Distance < b.Distance {
+						return 1
+					}
+					return 0
+				})
+			}
 
 			fmt.Fprintf(&sb, "Manga %d has %d tags -> %s - https://mangadex.org/title/%s\n", currentMangaIndex, numTags, (*currentManga.Title)["en"], currentManga.Id)
 
@@ -493,6 +522,25 @@ type customMatch struct {
 	Distance     float64
 	DistanceTag  float64
 	DistanceDesc float64
+}
+
+// MatchMinHeap implementation
+type MatchMinHeap []customMatch
+
+func (h MatchMinHeap) Len() int           { return len(h) }
+func (h MatchMinHeap) Less(i, j int) bool { return h[i].Distance < h[j].Distance } // Min-heap based on Distance
+func (h MatchMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *MatchMinHeap) Push(x interface{}) {
+	*h = append(*h, x.(customMatch))
+}
+
+func (h *MatchMinHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
 }
 
 // exportSimilar writes all similar manga data to individual files in data/similar/.
