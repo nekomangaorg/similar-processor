@@ -15,7 +15,7 @@ import (
 	"math"
 	"os"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -266,6 +266,10 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 			// Perform matching to all the other vectors
 			var matches []customMatch
 			for mangaMatchCheckIndex := 0; mangaMatchCheckIndex < len(mangaList); mangaMatchCheckIndex++ {
+				// Optimization: Skip self-match
+				if mangaMatchCheckIndex == currentMangaIndex {
+					continue
+				}
 
 				// Get score for both tags and description
 				distTag := pairwise.CosineSimilarity(vTagWeighted, lsiTagCSC.ColView(mangaMatchCheckIndex))
@@ -296,11 +300,23 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 				match.Distance = TagScoreRatio*distTag + distDesc
 				match.DistanceTag = distTag
 				match.DistanceDesc = distDesc
+
+				// Optimization: Skip appending if score is invalid and we are not in skippedMode.
+				// This reduces slice growth and sorting cost significantly.
+				if !skippedMode && match.Distance <= 0 {
+					continue
+				}
+
 				matches = append(matches, match)
 
 			}
-			sort.Slice(matches, func(i, j int) bool {
-				return matches[i].Distance > matches[j].Distance
+			slices.SortFunc(matches, func(a, b customMatch) int {
+				if a.Distance > b.Distance {
+					return -1
+				} else if a.Distance < b.Distance {
+					return 1
+				}
+				return 0
 			})
 
 			fmt.Fprintf(&sb, "Manga %d has %d tags -> %s - https://mangadex.org/title/%s\n", currentMangaIndex, numTags, (*currentManga.Title)["en"], currentManga.Id)
@@ -316,7 +332,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 			var matchesBest []customMatch
 			for _, match := range matches {
 
-				matchIndex := match.ID.(int)
+				matchIndex := match.ID
 
 				matchManga := mangaList[matchIndex]
 
@@ -359,7 +375,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 			avgIterTime := float64(currentMangaIndex+1) / time.Since(start).Seconds()
 
 			for i, match := range matchesBest {
-				id := match.ID.(int)
+				id := match.ID
 				score := similarMangaData.SimilarMatches[i].Score
 				fmt.Fprintf(&sb, "  | matched %d (%.3f tag, %.3f desc, %.3f comb) -> %s - https://mangadex.org/title/%s\n",
 					id, match.DistanceTag, match.DistanceDesc, score, truncateText((*mangaList[id].Title)["en"], 30), mangaList[id].Id)
@@ -402,7 +418,7 @@ func invalidForProcessing(match customMatch, currentMangaIndex int, currentManga
 	}
 
 	// Skip if the same id
-	matchMangaIndexId := match.ID.(int)
+	matchMangaIndexId := match.ID
 	if matchMangaIndexId == currentMangaIndex {
 		return true, "Same UUID"
 	}
@@ -437,7 +453,7 @@ func invalidForProcessing(match customMatch, currentMangaIndex int, currentManga
 // Type of match which also stores the description
 // Modeled after nlp.Match object
 type customMatch struct {
-	ID           interface{}
+	ID           int
 	Distance     float64
 	DistanceTag  float64
 	DistanceDesc float64
