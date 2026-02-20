@@ -1,7 +1,8 @@
 module github.com/similar-manga/similar
 
-go 1.21.0
-toolchain go1.24.1
+go 1.23.0
+
+toolchain go1.24.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
