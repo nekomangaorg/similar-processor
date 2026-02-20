@@ -46,6 +46,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 
 		mangaIdArray := collectAllMangaIds()
 
+		bar := internal.NewProgressBar(len(mangaIdArray), "chunks")
 		for index, ids := range mangaIdArray {
 
 			opts := mangadex.MangaApiGetSearchMangaOpts{}
@@ -53,7 +54,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 			opts.Limit = optional.NewInt32(100)
 			opts.Ids = optional.NewInterface(ids)
 
-			printProgress(index+1, len(mangaIdArray))
+			bar.Update(index + 1)
 
 			mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
@@ -61,7 +62,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 				UpsertManga(apiManga)
 			}
 		}
-		fmt.Println()
+		bar.Finish()
 
 	} else if updateId != "" {
 		fmt.Printf("Updating MangaDex metadata for %s\n", updateId)
@@ -129,21 +130,6 @@ func runMetadata(cmd *cobra.Command, args []string) {
 	ExportManga()
 
 	fmt.Printf("\t- Finished in %s\n", time.Since(start))
-}
-
-func printProgress(current, total int) {
-	if total <= 0 {
-		return
-	}
-	width := 50
-	percent := float64(current) / float64(total) * 100
-	completed := int(float64(width) * (float64(current) / float64(total)))
-	if completed > width {
-		completed = width
-	}
-
-	bar := strings.Repeat("=", completed) + strings.Repeat("-", width-completed)
-	fmt.Printf("\r[%s] %.2f%% (%d/%d)", bar, percent, current, total)
 }
 
 func collectAllMangaIds() [][]string {

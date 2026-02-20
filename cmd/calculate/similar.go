@@ -251,16 +251,12 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}
 
 		processed := 0
-        processed := 0
-        progressStartTime := time.Now()
-        for range progressChan {
+		bar := internal.NewProgressBar(amountOfMangaToProcess, "manga")
 		for range progressChan {
 			processed++
-			if processed%10 == 0 || processed == amountOfMangaToProcess {
-				fmt.Printf("\rProcessing: %d/%d (%.1f%%) - %.2f manga/sec", processed, amountOfMangaToProcess, float64(processed)/float64(amountOfMangaToProcess)*100, float64(processed)/time.Since(start).Seconds())
-			}
+			bar.Update(processed)
 		}
-		fmt.Println()
+		bar.Finish()
 	}()
 
 	for currentMangaIndex := 0; currentMangaIndex < len(mangaList); currentMangaIndex++ {
