@@ -248,7 +248,9 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}
 
 		processed := 0
-		start := time.Now()
+        processed := 0
+        progressStartTime := time.Now()
+        for range progressChan {
 		for range progressChan {
 			processed++
 			if processed%10 == 0 || processed == amountOfMangaToProcess {
