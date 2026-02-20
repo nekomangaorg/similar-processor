@@ -114,9 +114,9 @@ func createNekoMappingDB() *sql.DB {
 }
 
 func getGeneric(table string, uuid string) internal.DbGeneric {
-	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + table + " WHERE UUID = '" + uuid + "'")
-	defer rows.Close()
+	rows, err := internal.DB.Query("SELECT UUID, ID FROM "+table+" WHERE UUID = ?", uuid)
 	internal.CheckErr(err)
+	defer rows.Close()
 	generic := internal.DbGeneric{}
 	if rows.Next() {
 		rows.Scan(&generic.UUID, &generic.ID)

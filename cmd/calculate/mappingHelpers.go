@@ -16,9 +16,9 @@ import (
 )
 
 func muEntryExistsInNewIDDatabase(uuid string) bool {
-	rows, err := internal.DB.Query("SELECT UUID FROM " + internal.TableMangaupdatesNewId + " WHERE UUID= '" + uuid + "'")
-	defer rows.Close()
+	rows, err := internal.DB.Query("SELECT UUID FROM "+internal.TableMangaupdatesNewId+" WHERE UUID= ?", uuid)
 	internal.CheckErr(err)
+	defer rows.Close()
 	return rows.Next()
 }
 

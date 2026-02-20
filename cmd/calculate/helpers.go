@@ -26,7 +26,7 @@ func InsertSimilarData(similarData internal.SimilarManga) {
 }
 
 func getDBSimilar() []internal.DbSimilar {
-	rows, err := internal.DB.Query("SELECT UUID, JSON FROM SIMILAR")
+	rows, err := internal.DB.Query("SELECT UUID, JSON FROM SIMILAR ORDER BY UUID ASC")
 	defer rows.Close()
 	internal.CheckErr(err)
 

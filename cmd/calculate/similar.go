@@ -23,6 +23,16 @@ import (
 )
 
 var tagRegex = regexp.MustCompile("[^a-zA-Z0-9]+")
+const (
+	NumSimToGet          = 20
+	TagScoreRatio        = 0.40
+	IgnoreDescScoreUnder = 0.01
+	AcceptDescScoreOver  = 0.45
+	IgnoreTagsUnderCount = 2
+	MinDescriptionWords  = 15
+	DefaultTagWeight     = 0.70
+	SimilarityThreshold  = 1e-4
+)
 
 var similarCmd = &cobra.Command{
 	Use:   "similar",
@@ -63,14 +73,6 @@ func runSimilar(cmd *cobra.Command, args []string) {
 func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 	startProcessing := time.Now()
 
-	// Settings
-	numSimToGet := 20
-	tagScoreRatio := 0.40
-	ignoreDescScoreUnder := 0.01
-	acceptDescScoreOver := 0.45
-	ignoreTagsUnderCount := 2
-	minDescriptionWords := 15
-
 	// Loop through all manga and try to get their chapter information for each
 	countMangasProcessed := 0
 
@@ -86,7 +88,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 		for k := range debugMangaIds {
 			fmt.Printf("  - %s\n", k)
 		}
-		fmt.Println("\n")
+		fmt.Println()
 
 	} else {
 		DeleteSimilarDB()
@@ -195,7 +197,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 	dimR, dimC := lsiTagCSCWeighted.Dims()
 	for r := 0; r < dimR; r++ {
 		tag := vocabularyInverse[r]
-		tagWeight := 0.70
+		tagWeight := DefaultTagWeight
 		if val, ok := tagWeights[tag]; ok {
 			tagWeight = val
 		}
@@ -248,7 +250,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 			vDesc := lsiDescCSC.ColView(currentMangaIndex)
 
 			// Skip this manga if it has no description
-			if corpusDescLength[currentMangaIndex] < minDescriptionWords {
+			if corpusDescLength[currentMangaIndex] < MinDescriptionWords {
 				<-guard
 				return
 			}
@@ -270,28 +272,28 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 				distDesc := pairwise.CosineSimilarity(vDesc, lsiDescCSC.ColView(mangaMatchCheckIndex))
 
 				// Reject invalid matches
-				if math.IsNaN(distTag) || distTag < 1e-4 {
+				if math.IsNaN(distTag) || distTag < SimilarityThreshold {
 					distTag = 0
 				}
-				if math.IsNaN(distDesc) || distDesc < 1e-4 {
+				if math.IsNaN(distDesc) || distDesc < SimilarityThreshold {
 					distDesc = 0
 				}
 
 				// Special reject criteria to try to be robust to small label / description length
-				if numTags < ignoreTagsUnderCount {
+				if numTags < IgnoreTagsUnderCount {
 					distTag = 1
 				}
-				if distDesc < ignoreDescScoreUnder || corpusDescLength[mangaMatchCheckIndex] < minDescriptionWords {
+				if distDesc < IgnoreDescScoreUnder || corpusDescLength[mangaMatchCheckIndex] < MinDescriptionWords {
 					distDesc = 0
 				}
-				if distDesc > acceptDescScoreOver {
+				if distDesc > AcceptDescScoreOver {
 					distTag = 1
 				}
 
 				// Combine the two
 				match := customMatch{}
 				match.ID = mangaMatchCheckIndex
-				match.Distance = tagScoreRatio*distTag + distDesc
+				match.Distance = TagScoreRatio*distTag + distDesc
 				match.DistanceTag = distTag
 				match.DistanceDesc = distDesc
 				matches = append(matches, match)
@@ -330,7 +332,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 				matchData.Id = matchManga.Id
 				matchData.Title = *matchManga.Title
 				matchData.ContentRating = matchManga.ContentRating
-				matchData.Score = float32(match.Distance) / float32(tagScoreRatio+1.0)
+				matchData.Score = float32(match.Distance) / float32(TagScoreRatio+1.0)
 				matchData.Languages = matchManga.AvailableTranslatedLanguages
 				similarMangaData.SimilarMatches = append(similarMangaData.SimilarMatches, matchData)
 				matchesBest = append(matchesBest, match)
@@ -341,7 +343,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 				}
 
 				// Exit if we have found enough calculate manga!
-				if len(similarMangaData.SimilarMatches) >= numSimToGet {
+				if len(similarMangaData.SimilarMatches) >= NumSimToGet {
 					break
 				}
 
@@ -441,20 +443,45 @@ type customMatch struct {
 	DistanceDesc float64
 }
 
+// exportSimilar writes all similar manga data to individual files in data/similar/.
+// It optimizes file I/O by grouping writes to the same file (based on UUID prefix),
+// which reduces syscalls significantly when similarList is sorted by UUID.
 func exportSimilar() {
 	os.RemoveAll("data/similar/")
-	os.MkdirAll("data/similar/", 0777)
+	os.MkdirAll("data/similar/", 0755)
 	similarList := getDBSimilar()
+
+	var currentFile *os.File
+	var currentSuffix string
+	var currentFolder string
+
 	for _, similar := range similarList {
 		folder := similar.Id[0:2]
 		suffix := similar.Id[0:3]
-		os.Mkdir("data/similar/"+folder, 0777)
-		file, err := os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
-		if err != nil {
+
+		if suffix != currentSuffix {
+			if currentFile != nil {
+				currentFile.Close()
+			}
+
+			if folder != currentFolder {
+				os.Mkdir("data/similar/"+folder, 0755)
+				currentFolder = folder
+			}
+
+			var err error
+			currentFile, err = os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			currentSuffix = suffix
+		}
+
+		if _, err := currentFile.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n"); err != nil {
 			log.Fatal(err)
 		}
-		file.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
-		file.Close()
-
+	}
+	if currentFile != nil {
+		currentFile.Close()
 	}
 }
