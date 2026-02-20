@@ -86,14 +86,16 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 		// Try the existing as the id (not likely since mangadex won't have updated..)
 		resp1, err1 := http.Get("https://api.mangaupdates.com/v1/series/" + convertedId)
 		internal.CheckErr(err1)
-		defer resp1.Body.Close()
 
 		if err1 == nil && resp1.StatusCode == 200 {
+			drainAndClose(resp1)
+
 			fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id...\n", index+1, total, uuid, idOriginal)
 			upsertNewMuId(uuid, convertedId)
 			internal.CheckErr(err)
 
 		} else {
+			drainAndClose(resp1)
 
 			// We have a couple retires here
 			counterMax := 5
@@ -109,30 +111,37 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 				req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36")
 				resp, err := client.Do(req)
 				internal.CheckErr(err)
-				defer resp.Body.Close()
 
 				// Sleep if we get a warning, otherwise we don't retry again!
 				if err == nil && resp.StatusCode == 429 {
 					fmt.Printf("\u001B[1;31m %s EXTERNAL MU: http code %d (try %d of %d)\u001B[0m\n", uuid, resp.StatusCode, counter, counterMax)
+
+					drainAndClose(resp)
+
 					time.Sleep(2.0 * time.Second)
-				}
-				if err == nil && resp.StatusCode != 200 {
+				} else if err == nil && resp.StatusCode != 200 {
 					if resp.StatusCode == 503 {
 						//this is a bad id on Dex's side write to debug file
 						WriteLineToDebugFile("BadMUIds", "https://mangadex.org/title/"+uuid)
+
+						drainAndClose(resp)
+
 						return false
 					} else {
 						fmt.Printf("\u001B[1;31m %s EXTERNAL MU %s: http code %d (try %d of %d)\u001B[0m\n", uuid, url, resp.StatusCode, counter, counterMax)
+
+						drainAndClose(resp)
+
 						time.Sleep(2.0 * time.Second)
 					}
 
-				}
-
-				// Load the HTML document
-				// Logic found using google chrome (right click in inspector and copy "selector")
-				if err == nil && resp.StatusCode == 200 {
+				} else if err == nil && resp.StatusCode == 200 {
+					// Load the HTML document
+					// Logic found using google chrome (right click in inspector and copy "selector")
 					doc, err := goquery.NewDocumentFromReader(resp.Body)
 					internal.CheckErr(err)
+
+					drainAndClose(resp)
 
 					if err == nil {
 						rssUrl := doc.Find("#main_content > div:nth-child(2) > div.row.no-gutters > div.col-12.p-2 > a").AttrOr("href", "")
@@ -144,10 +153,20 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 							return true
 						}
 					}
+				} else {
+					// Catch all case to ensure body is closed
+					drainAndClose(resp)
 				}
 			}
 		}
 	}
 	return false
 
+}
+
+func drainAndClose(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
 }
