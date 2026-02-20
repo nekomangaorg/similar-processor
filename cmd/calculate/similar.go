@@ -474,7 +474,9 @@ func exportSimilar() {
 			currentSuffix = suffix
 		}
 
-		currentFile.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n")
+		if _, err := currentFile.WriteString(similar.Id + ":::||@!@||:::" + similar.JSON + "\n"); err != nil {
+			log.Fatal(err)
+		}
 	}
 	if currentFile != nil {
 		currentFile.Close()
