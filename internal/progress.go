@@ -23,7 +23,7 @@ func NewProgressBar(total int, unit string) *ProgressBar {
 		Unit:       unit,
 		StartTime:  time.Now(),
 		Width:      40,
-		lastUpdate: time.Now(),
+		lastUpdate: time.Time{},
 	}
 }
 
