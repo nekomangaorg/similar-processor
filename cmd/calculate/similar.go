@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"container/heap"
 	"fmt"
 	"github.com/caneroj1/stemmer"
 	"github.com/james-bowman/nlp"
@@ -251,9 +252,6 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}
 
 		processed := 0
-        processed := 0
-        progressStartTime := time.Now()
-        for range progressChan {
 		for range progressChan {
 			processed++
 			if processed%10 == 0 || processed == amountOfMangaToProcess {
@@ -294,60 +292,144 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 			var sb strings.Builder
 
 			// Perform matching to all the other vectors
-			var matches []customMatch
-			for mangaMatchCheckIndex := 0; mangaMatchCheckIndex < len(mangaList); mangaMatchCheckIndex++ {
-				// Optimization: Skip self-match
-				if mangaMatchCheckIndex == currentMangaIndex {
-					continue
+			var matchesBest []customMatch
+
+			if !skippedMode {
+				// Optimized path using MinHeap
+				h := &MatchMinHeap{}
+				heap.Init(h)
+
+				for mangaMatchCheckIndex := 0; mangaMatchCheckIndex < len(mangaList); mangaMatchCheckIndex++ {
+					if mangaMatchCheckIndex == currentMangaIndex {
+						continue
+					}
+
+					distTag := pairwise.CosineSimilarity(vTagWeighted, lsiTagCSC.ColView(mangaMatchCheckIndex))
+					distDesc := pairwise.CosineSimilarity(vDesc, lsiDescCSC.ColView(mangaMatchCheckIndex))
+
+					if math.IsNaN(distTag) || distTag < SimilarityThreshold {
+						distTag = 0
+					}
+					if math.IsNaN(distDesc) || distDesc < SimilarityThreshold {
+						distDesc = 0
+					}
+
+					if numTags < IgnoreTagsUnderCount {
+						distTag = 1
+					}
+					if distDesc < IgnoreDescScoreUnder || corpusDescLength[mangaMatchCheckIndex] < MinDescriptionWords {
+						distDesc = 0
+					}
+					if distDesc > AcceptDescScoreOver {
+						distTag = 1
+					}
+
+					match := customMatch{
+						ID:           mangaMatchCheckIndex,
+						Distance:     TagScoreRatio*distTag + distDesc,
+						DistanceTag:  distTag,
+						DistanceDesc: distDesc,
+					}
+
+					if match.Distance <= 0 {
+						continue
+					}
+
+					// Only validate if we need to
+					if h.Len() < NumSimToGet {
+						// Validate immediately
+						matchManga := mangaList[mangaMatchCheckIndex]
+						if invalid, _ := invalidForProcessing(match, currentMangaIndex, currentManga, matchManga); !invalid {
+							heap.Push(h, match)
+						}
+					} else if match.Distance > (*h)[0].Distance {
+						// Only if potential score is better than our worst
+						matchManga := mangaList[mangaMatchCheckIndex]
+						if invalid, _ := invalidForProcessing(match, currentMangaIndex, currentManga, matchManga); !invalid {
+							heap.Pop(h)
+							heap.Push(h, match)
+						}
+					}
 				}
 
-				// Get score for both tags and description
-				distTag := pairwise.CosineSimilarity(vTagWeighted, lsiTagCSC.ColView(mangaMatchCheckIndex))
-				distDesc := pairwise.CosineSimilarity(vDesc, lsiDescCSC.ColView(mangaMatchCheckIndex))
-
-				// Reject invalid matches
-				if math.IsNaN(distTag) || distTag < SimilarityThreshold {
-					distTag = 0
+				// Extract from heap
+				for h.Len() > 0 {
+					matchesBest = append(matchesBest, heap.Pop(h).(customMatch))
 				}
-				if math.IsNaN(distDesc) || distDesc < SimilarityThreshold {
-					distDesc = 0
+				// Sort descending
+				slices.SortFunc(matchesBest, func(a, b customMatch) int {
+					if a.Distance > b.Distance {
+						return -1
+					} else if a.Distance < b.Distance {
+						return 1
+					}
+					return 0
+				})
+			} else {
+				// Legacy path with skippedMode support
+				var matches []customMatch
+				for mangaMatchCheckIndex := 0; mangaMatchCheckIndex < len(mangaList); mangaMatchCheckIndex++ {
+					if mangaMatchCheckIndex == currentMangaIndex {
+						continue
+					}
+
+					distTag := pairwise.CosineSimilarity(vTagWeighted, lsiTagCSC.ColView(mangaMatchCheckIndex))
+					distDesc := pairwise.CosineSimilarity(vDesc, lsiDescCSC.ColView(mangaMatchCheckIndex))
+
+					if math.IsNaN(distTag) || distTag < SimilarityThreshold {
+						distTag = 0
+					}
+					if math.IsNaN(distDesc) || distDesc < SimilarityThreshold {
+						distDesc = 0
+					}
+
+					if numTags < IgnoreTagsUnderCount {
+						distTag = 1
+					}
+					if distDesc < IgnoreDescScoreUnder || corpusDescLength[mangaMatchCheckIndex] < MinDescriptionWords {
+						distDesc = 0
+					}
+					if distDesc > AcceptDescScoreOver {
+						distTag = 1
+					}
+
+					match := customMatch{
+						ID:           mangaMatchCheckIndex,
+						Distance:     TagScoreRatio*distTag + distDesc,
+						DistanceTag:  distTag,
+						DistanceDesc: distDesc,
+					}
+
+					if match.Distance <= 0 {
+						continue
+					}
+
+					matches = append(matches, match)
 				}
 
-				// Special reject criteria to try to be robust to small label / description length
-				if numTags < IgnoreTagsUnderCount {
-					distTag = 1
-				}
-				if distDesc < IgnoreDescScoreUnder || corpusDescLength[mangaMatchCheckIndex] < MinDescriptionWords {
-					distDesc = 0
-				}
-				if distDesc > AcceptDescScoreOver {
-					distTag = 1
-				}
+				slices.SortFunc(matches, func(a, b customMatch) int {
+					if a.Distance > b.Distance {
+						return -1
+					} else if a.Distance < b.Distance {
+						return 1
+					}
+					return 0
+				})
 
-				// Combine the two
-				match := customMatch{}
-				match.ID = mangaMatchCheckIndex
-				match.Distance = TagScoreRatio*distTag + distDesc
-				match.DistanceTag = distTag
-				match.DistanceDesc = distDesc
-
-				// Optimization: Skip appending if score is invalid and we are not in skippedMode.
-				// This reduces slice growth and sorting cost significantly.
-				if !skippedMode && match.Distance <= 0 {
-					continue
+				for _, match := range matches {
+					matchManga := mangaList[match.ID]
+					if invalid, reason := invalidForProcessing(match, currentMangaIndex, currentManga, matchManga); invalid {
+						if skippedMode {
+							fmt.Fprintf(&sb, "  | skipped because %s ->%s - https://mangadex.org/title/%s\n", reason, truncateText((*matchManga.Title)["en"], 30), matchManga.Id)
+						}
+						continue
+					}
+					matchesBest = append(matchesBest, match)
+					if len(matchesBest) >= NumSimToGet {
+						break
+					}
 				}
-
-				matches = append(matches, match)
-
 			}
-			slices.SortFunc(matches, func(a, b customMatch) int {
-				if a.Distance > b.Distance {
-					return -1
-				} else if a.Distance < b.Distance {
-					return 1
-				}
-				return 0
-			})
 
 			fmt.Fprintf(&sb, "Manga %d has %d tags -> %s - https://mangadex.org/title/%s\n", currentMangaIndex, numTags, (*currentManga.Title)["en"], currentManga.Id)
 
@@ -358,41 +440,23 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 			similarMangaData.ContentRating = currentManga.ContentRating
 			similarMangaData.UpdatedAt = time.Now().UTC().Format("2006-01-02T15:04:05+00:00")
 
-			// Finally loop through all our matches and try to find the best ones!
-			var matchesBest []customMatch
-			for _, match := range matches {
+			// Convert matchesBest to internal.SimilarMatch
+			for _, match := range matchesBest {
+				matchManga := mangaList[match.ID]
 
-				matchIndex := match.ID
-
-				matchManga := mangaList[matchIndex]
-
-				if invalid, reason := invalidForProcessing(match, currentMangaIndex, currentManga, matchManga); invalid {
-					if skippedMode {
-						fmt.Fprintf(&sb, "  | skipped because %s ->%s - https://mangadex.org/title/%s\n", reason, truncateText((*matchManga.Title)["en"], 30), matchManga.Id)
-					}
-					continue
-				}
-
-				// Otherwise lets append it!
 				matchData := internal.SimilarMatch{}
 				matchData.Id = matchManga.Id
 				matchData.Title = *matchManga.Title
 				matchData.ContentRating = matchManga.ContentRating
 				matchData.Score = float32(match.Distance) / float32(TagScoreRatio+1.0)
 				matchData.Languages = matchManga.AvailableTranslatedLanguages
-				similarMangaData.SimilarMatches = append(similarMangaData.SimilarMatches, matchData)
-				matchesBest = append(matchesBest, match)
 
 				// Debug error if score is invalid
 				if matchData.Score > 1 || matchData.Score < 0 {
 					log.Fatalf("\u001B[1;31mINVALID SCORE: %s -> %s gave %.4f\u001B[0m\n", similarMangaData.Id, matchManga.Id, matchData.Score)
 				}
 
-				// Exit if we have found enough calculate manga!
-				if len(similarMangaData.SimilarMatches) >= NumSimToGet {
-					break
-				}
-
+				similarMangaData.SimilarMatches = append(similarMangaData.SimilarMatches, matchData)
 			}
 
 			// Finally if we have non-zero matches then we should save it!
@@ -492,6 +556,25 @@ type customMatch struct {
 	Distance     float64
 	DistanceTag  float64
 	DistanceDesc float64
+}
+
+// MatchMinHeap implementation for customMatch
+type MatchMinHeap []customMatch
+
+func (h MatchMinHeap) Len() int           { return len(h) }
+func (h MatchMinHeap) Less(i, j int) bool { return h[i].Distance < h[j].Distance }
+func (h MatchMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *MatchMinHeap) Push(x interface{}) {
+	*h = append(*h, x.(customMatch))
+}
+
+func (h *MatchMinHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
 }
 
 // exportSimilar writes all similar manga data to individual files in data/similar/.
