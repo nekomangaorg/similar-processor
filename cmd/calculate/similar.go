@@ -22,6 +22,8 @@ import (
 	"unicode"
 )
 
+var tagRegex = regexp.MustCompile("[^a-zA-Z0-9]+")
+
 const (
 	NumSimToGet          = 20
 	TagScoreRatio        = 0.40
@@ -107,8 +109,9 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 		// Get the tag and description for this manga
 		tagText := ""
 		for _, tag := range manga.Tags {
-			reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
-			tagText += reg.ReplaceAllString((*tag.Name)["en"], "") + " "
+			if tag.Name != nil {
+				tagText += tagRegex.ReplaceAllString((*tag.Name)["en"], "") + " "
+			}
 		}
 		descText := similar.CleanTitle((*manga.Title)["en"]) + " "
 		for _, altTitle := range manga.AltTitles {
