@@ -467,7 +467,7 @@ func exportSimilar() {
 			}
 
 			var err error
-			currentFile, err = os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+			currentFile, err = os.OpenFile("data/similar/"+folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				log.Fatal(err)
 			}
