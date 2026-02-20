@@ -462,7 +462,7 @@ func exportSimilar() {
 			}
 
 			if folder != currentFolder {
-				os.Mkdir("data/similar/"+folder, 0777)
+				os.Mkdir("data/similar/"+folder, 0755)
 				currentFolder = folder
 			}
 
