@@ -22,6 +22,8 @@ import (
 	"unicode"
 )
 
+var tagRegex = regexp.MustCompile("[^a-zA-Z0-9]+")
+
 var similarCmd = &cobra.Command{
 	Use:   "similar",
 	Short: "This updates the similar calculations",
@@ -104,8 +106,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 		// Get the tag and description for this manga
 		tagText := ""
 		for _, tag := range manga.Tags {
-			reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
-			tagText += reg.ReplaceAllString((*tag.Name)["en"], "") + " "
+			tagText += tagRegex.ReplaceAllString((*tag.Name)["en"], "") + " "
 		}
 		descText := similar.CleanTitle((*manga.Title)["en"]) + " "
 		for _, altTitle := range manga.AltTitles {
