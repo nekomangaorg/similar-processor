@@ -99,6 +99,10 @@ func contains(haystack []string, needle string) bool {
 
 // parameterToString convert interface{} parameters to string, using a delimiter if format is provided.
 func parameterToString(obj interface{}, collectionFormat string) string {
+	if obj == nil {
+		return ""
+	}
+
 	var delimiter string
 
 	switch collectionFormat {
@@ -113,7 +117,12 @@ func parameterToString(obj interface{}, collectionFormat string) string {
 	}
 
 	if reflect.TypeOf(obj).Kind() == reflect.Slice {
-		return strings.Trim(strings.Replace(fmt.Sprint(obj), " ", delimiter, -1), "[]")
+		v := reflect.ValueOf(obj)
+		var items []string
+		for i := 0; i < v.Len(); i++ {
+			items = append(items, fmt.Sprintf("%v", v.Index(i).Interface()))
+		}
+		return strings.Join(items, delimiter)
 	}
 
 	return fmt.Sprintf("%v", obj)
