@@ -445,7 +445,7 @@ type customMatch struct {
 // which reduces syscalls significantly when similarList is sorted by UUID.
 func exportSimilar() {
 	os.RemoveAll("data/similar/")
-	os.MkdirAll("data/similar/", 0777)
+	os.MkdirAll("data/similar/", 0755)
 	similarList := getDBSimilar()
 
 	var currentFile *os.File
