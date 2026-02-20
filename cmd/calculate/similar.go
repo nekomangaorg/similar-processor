@@ -48,6 +48,7 @@ func init() {
 	similarCmd.Flags().BoolP("debug", "d", false, "Run a set of debug entries only.  Printing results to the screen only.")
 	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
 	similarCmd.Flags().IntP("threads", "t", 1000, "Change the batch processing amount")
+	similarCmd.Flags().BoolP("verbose", "v", false, "Print detailed match information")
 }
 func runSimilar(cmd *cobra.Command, args []string) {
 
@@ -55,10 +56,11 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	skippedMode, _ := cmd.Flags().GetBool("skipped")
 	exportOnly, _ := cmd.Flags().GetBool("export")
 	threads, _ := cmd.Flags().GetInt("threads")
+	verbose, _ := cmd.Flags().GetBool("verbose")
 
 	if !exportOnly {
 		fmt.Printf("\nBegin calculating similars\n")
-		calculateSimilars(debugMode, skippedMode, threads)
+		calculateSimilars(debugMode, skippedMode, threads, verbose)
 	}
 
 	if !debugMode {
@@ -71,7 +73,7 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 }
 
-func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
+func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bool) {
 	startProcessing := time.Now()
 
 	// Loop through all manga and try to get their chapter information for each
@@ -236,6 +238,31 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 	//	// We will then combine these into a single score which is then used to rank all manga
 	start = time.Now()
 
+	var progressWg sync.WaitGroup
+	progressChan := make(chan struct{}, maxGoroutines*2)
+
+	progressWg.Add(1)
+	go func() {
+		defer progressWg.Done()
+		if verbose || debugMode {
+			for range progressChan {
+			}
+			return
+		}
+
+		processed := 0
+        processed := 0
+        progressStartTime := time.Now()
+        for range progressChan {
+		for range progressChan {
+			processed++
+			if processed%10 == 0 || processed == amountOfMangaToProcess {
+				fmt.Printf("\rProcessing: %d/%d (%.1f%%) - %.2f manga/sec", processed, amountOfMangaToProcess, float64(processed)/float64(amountOfMangaToProcess)*100, float64(processed)/time.Since(start).Seconds())
+			}
+		}
+		fmt.Println()
+	}()
+
 	for currentMangaIndex := 0; currentMangaIndex < len(mangaList); currentMangaIndex++ {
 
 		// would block if guard channel is already filled
@@ -387,13 +414,18 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int) {
 				//This line makes no sense if we are in debug mode
 				fmt.Fprintf(&sb, "%d/%d processed at %.2f manga/sec....\n\n", currentMangaIndex+1, amountOfMangaToProcess, avgIterTime)
 			}
-			fmt.Println(sb.String())
+			if verbose || debugMode {
+				fmt.Println(sb.String())
+			}
+			progressChan <- struct{}{}
 
 			<-guard
 		}(currentMangaIndex)
 
 	}
 	wg.Wait()
+	close(progressChan)
+	progressWg.Wait()
 
 	fmt.Printf("Calculated simularities for %d Manga in %s\n\n", amountOfMangaToProcess, time.Since(startProcessing))
 
