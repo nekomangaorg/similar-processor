@@ -170,6 +170,33 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		descVectors[i] = lsiDescCSC.ColView(i)
 	}
 
+	// Language Bitmask Pre-calculation
+	uniqueLangs := make(map[string]uint64)
+	nextBit := 0
+	for _, m := range mangaList {
+		for _, l := range m.AvailableTranslatedLanguages {
+			if _, exists := uniqueLangs[l]; !exists {
+				if nextBit < 63 {
+					uniqueLangs[l] = 1 << nextBit
+					nextBit++
+				} else {
+					uniqueLangs[l] = 1 << 63
+				}
+			}
+		}
+	}
+
+	langMasks := make([]uint64, len(mangaList))
+	for i, m := range mangaList {
+		var mask uint64
+		for _, l := range m.AvailableTranslatedLanguages {
+			if val, ok := uniqueLangs[l]; ok {
+				mask |= val
+			}
+		}
+		langMasks[i] = mask
+	}
+
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
 	var wg sync.WaitGroup
@@ -179,7 +206,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, mangaList, tagVectors, descVectors, corpusDescLength, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
+				processManga(idx, mangaList, tagVectors, descVectors, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
 			}
 		}()
 	}
@@ -214,7 +241,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
-func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector, descLens []int, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
+func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
 	defer func() { progress <- struct{}{} }()
 
 	current := list[idx]
@@ -231,9 +258,20 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector
 	vDesc := descVecs[idx]
 	h := &MatchMinHeap{}
 	heap.Init(h)
+	currentMask := langMasks[idx]
 
 	for i := 0; i < len(list); i++ {
 		if i == idx {
+			continue
+		}
+
+		// Performance Optimization:
+		// If the current manga has languages specified, the target manga MUST share at least one language
+		// to be considered similar (as per existing invalidForProcessing logic).
+		// We use a pre-calculated bitmask to quickly skip pairs with no common languages.
+		// If currentMask is 0 (no languages), we don't skip because existing logic allows it.
+		// If (currentMask & targetMask) == 0, it means no common languages (or overflow bits match, which is safe).
+		if currentMask != 0 && (currentMask&langMasks[i]) == 0 {
 			continue
 		}
 
