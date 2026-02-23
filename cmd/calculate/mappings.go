@@ -175,7 +175,7 @@ func calculateMangaUpdatesMapping(mangaList []internal.Manga) {
 
 func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
 	fmt.Println("Calculating MangaUpdates New Id Mapping")
-	rateLimiter := ratelimit.New(1)
+	rateLimiter := ratelimit.New(1, ratelimit.Per(2*time.Second))
 
 	// mangaupdates
 	// https://www.mangaupdates.com/series.html?id=`{id}`
