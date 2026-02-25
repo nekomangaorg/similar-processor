@@ -25,152 +25,36 @@ func runMappings(cmd *cobra.Command, args []string) {
 
 	mangaList := internal.GetAllManga()
 
-	calculateAniListMapping(mangaList)
-	calculateAnimePlanetMapping(mangaList)
-	calculateBookWalkerMapping(mangaList)
-	calculateNovelUpdatesMapping(mangaList)
-	calculateKitsuMapping(mangaList)
-	calculateMyAnimeListMapping(mangaList)
-	calculateMangaUpdatesMapping(mangaList)
+	calculateGenericMapping(mangaList, "AniList", "al", internal.TableAnilist, "anilist2mdex", "Exporting AniList mapping file")
+	calculateGenericMapping(mangaList, "AnimePlanet", "ap", internal.TableAnimePlanet, "animeplanet2mdex", "Exporting Anime Planet mapping file")
+	calculateGenericMapping(mangaList, "BookWalker", "bw", internal.TableBookWalker, "bookwalker2mdex", "Exporting Book Walker mapping file")
+	calculateGenericMapping(mangaList, "NovelUpdates", "nu", internal.TableNovelUpdates, "novelupdates2mdex", "Exporting NovelUpdates mapping file")
+	calculateGenericMapping(mangaList, "Kitsu", "kt", internal.TableKitsu, "kitsu2mdex", "Exporting Kitsu mapping file")
+	calculateGenericMapping(mangaList, "MyAnimeList", "mal", internal.TableMyanimelist, "myanimelist2mdex", "Exporting MyAnimeList New Ids file")
+	calculateGenericMapping(mangaList, "MangaUpdates", "mu", internal.TableMangaupdates, "mangaupdates2mdex", "Exporting MangaUpdates mapping file")
+
 	calculateMangaUpdatesNewIdMapping(mangaList)
 
 	fmt.Printf("Finished all mappings in %s\n", time.Since(initialStart))
 
 }
 
-func calculateAniListMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating AniList Mapping")
+func calculateGenericMapping(mangaList []internal.Manga, mappingName string, linkKey string, tableName string, exportFileName string, exportMessage string) {
+	fmt.Printf("Calculating %s Mapping\n", mappingName)
 	tx, err := internal.DB.Begin()
 	internal.CheckErr(err)
 	for _, manga := range mangaList {
-		id := manga.Links["al"]
+		id := manga.Links[linkKey]
 		if id != "" {
-			UpsertGeneric(tx, internal.TableAnilist, manga.Id, id)
+			UpsertGeneric(tx, tableName, manga.Id, id)
 		}
 	}
 	err = tx.Commit()
 	internal.CheckErr(err)
 
-	fmt.Println("Exporting AniList mapping file")
-	ExportAniList()
-}
-
-func calculateAnimePlanetMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating AnimePlanet Mapping")
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-	for _, manga := range mangaList {
-		id := manga.Links["ap"]
-		if id != "" {
-			UpsertGeneric(tx, internal.TableAnimePlanet, manga.Id, id)
-		}
-	}
-	err = tx.Commit()
-	internal.CheckErr(err)
-
-	fmt.Println("Exporting Anime Planet mapping file")
-	ExportAnimePlanet()
-}
-
-func calculateBookWalkerMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating BookWalker Mapping")
-
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-
-	for _, manga := range mangaList {
-		id := manga.Links["bw"]
-		if id != "" {
-			UpsertGeneric(tx, internal.TableBookWalker, manga.Id, id)
-		}
-	}
-
-	err = tx.Commit()
-	internal.CheckErr(err)
-
-	fmt.Println("Exporting Book Walker mapping file")
-	ExportBookWalker()
-}
-
-func calculateNovelUpdatesMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating NovelUpdates Mapping")
-
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-
-	for _, manga := range mangaList {
-		id := manga.Links["nu"]
-		if id != "" {
-			UpsertGeneric(tx, internal.TableNovelUpdates, manga.Id, id)
-		}
-	}
-
-	err = tx.Commit()
-	internal.CheckErr(err)
-
-	fmt.Println("Exporting NovelUpdates mapping file")
-	ExportNovelUpdates()
-}
-
-func calculateKitsuMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating Kitsu Mapping")
-
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-
-	for _, manga := range mangaList {
-		id := manga.Links["kt"]
-		if id != "" {
-			UpsertGeneric(tx, internal.TableKitsu, manga.Id, id)
-		}
-	}
-
-	err = tx.Commit()
-	internal.CheckErr(err)
-
-	fmt.Println("Exporting Kitsu mapping file")
-	ExportKitsu()
-}
-
-func calculateMyAnimeListMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating MyAnimeList Mapping")
-
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-
-	for _, manga := range mangaList {
-		id := manga.Links["mal"]
-		if id != "" {
-			UpsertGeneric(tx, internal.TableMyanimelist, manga.Id, id)
-		}
-	}
-
-	err = tx.Commit()
-	internal.CheckErr(err)
-
-	fmt.Println("Exporting MyAnimeList New Ids file")
-	ExportMyAnimeList()
-}
-
-func calculateMangaUpdatesMapping(mangaList []internal.Manga) {
-	fmt.Println("Calculating MangaUpdates Mapping")
-
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-
-	for _, manga := range mangaList {
-		id := manga.Links["mu"]
-		if id != "" {
-			UpsertGeneric(tx, internal.TableMangaupdates, manga.Id, id)
-		}
-	}
-
-	err = tx.Commit()
-	internal.CheckErr(err)
-
-	fmt.Println("Exporting MangaUpdates mapping file")
-	ExportMangaUpdates()
-
+	fmt.Println(exportMessage)
+	genericList := getAllGenericFromTable(tableName)
+	exportGeneric(exportFileName, genericList)
 }
 
 func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
@@ -217,7 +101,8 @@ func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
 	wg.Wait()
 
 	fmt.Println("Exporting MangaUpdates New Ids file")
-	ExportMangaUpdatesNewIds()
+	genericList := getAllGenericFromTable(internal.TableMangaupdatesNewId)
+	exportGeneric("mangaupdates_new2mdex", genericList)
 
 	fmt.Printf("done processing MangaUpdates New Ids (%.2f seconds)!\n", time.Since(start).Seconds())
 }
