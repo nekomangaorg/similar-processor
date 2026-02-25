@@ -1,0 +1,3 @@
+## 2024-05-24 - [Optimizing Sparse Cosine Similarity]
+**Learning:** `pairwise.CosineSimilarity` (and generic interface access like `mat.Vector.At()`) introduces significant overhead when computing similarity for large sparse datasets. By accessing the underlying `RawVector` data (indices and values) of `*sparse.Vector` and implementing a custom dot product that assumes sorted indices (O(NNZ)), we achieved a >2.5x speedup per operation. Additionally, pre-calculating L2 norms avoids redundant O(N) calculations in the inner loop.
+**Action:** When working with `gonum` or `sparse` libraries in tight loops, check if you can type-assert to concrete types to bypass interface method dispatch overhead and access raw data structures for manual optimization.
