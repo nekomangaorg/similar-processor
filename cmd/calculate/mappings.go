@@ -25,13 +25,27 @@ func runMappings(cmd *cobra.Command, args []string) {
 
 	mangaList := internal.GetAllManga()
 
-	calculateGenericMapping(mangaList, "AniList", "al", internal.TableAnilist, "anilist2mdex", "Exporting AniList mapping file")
-	calculateGenericMapping(mangaList, "AnimePlanet", "ap", internal.TableAnimePlanet, "animeplanet2mdex", "Exporting Anime Planet mapping file")
-	calculateGenericMapping(mangaList, "BookWalker", "bw", internal.TableBookWalker, "bookwalker2mdex", "Exporting Book Walker mapping file")
-	calculateGenericMapping(mangaList, "NovelUpdates", "nu", internal.TableNovelUpdates, "novelupdates2mdex", "Exporting NovelUpdates mapping file")
-	calculateGenericMapping(mangaList, "Kitsu", "kt", internal.TableKitsu, "kitsu2mdex", "Exporting Kitsu mapping file")
-	calculateGenericMapping(mangaList, "MyAnimeList", "mal", internal.TableMyanimelist, "myanimelist2mdex", "Exporting MyAnimeList New Ids file")
-	calculateGenericMapping(mangaList, "MangaUpdates", "mu", internal.TableMangaupdates, "mangaupdates2mdex", "Exporting MangaUpdates mapping file")
+	type mappingConfig struct {
+		mappingName    string
+		linkKey        string
+		tableName      string
+		exportFileName string
+		exportMessage  string
+	}
+
+	configs := []mappingConfig{
+		{"AniList", "al", internal.TableAnilist, "anilist2mdex", "Exporting AniList mapping file"},
+		{"AnimePlanet", "ap", internal.TableAnimePlanet, "animeplanet2mdex", "Exporting Anime Planet mapping file"},
+		{"BookWalker", "bw", internal.TableBookWalker, "bookwalker2mdex", "Exporting Book Walker mapping file"},
+		{"NovelUpdates", "nu", internal.TableNovelUpdates, "novelupdates2mdex", "Exporting NovelUpdates mapping file"},
+		{"Kitsu", "kt", internal.TableKitsu, "kitsu2mdex", "Exporting Kitsu mapping file"},
+		{"MyAnimeList", "mal", internal.TableMyanimelist, "myanimelist2mdex", "Exporting MyAnimeList New Ids file"},
+		{"MangaUpdates", "mu", internal.TableMangaupdates, "mangaupdates2mdex", "Exporting MangaUpdates mapping file"},
+	}
+
+	for _, config := range configs {
+		calculateGenericMapping(mangaList, config.mappingName, config.linkKey, config.tableName, config.exportFileName, config.exportMessage)
+	}
 
 	calculateMangaUpdatesNewIdMapping(mangaList)
 
@@ -43,6 +57,8 @@ func calculateGenericMapping(mangaList []internal.Manga, mappingName string, lin
 	fmt.Printf("Calculating %s Mapping\n", mappingName)
 	tx, err := internal.DB.Begin()
 	internal.CheckErr(err)
+	defer tx.Rollback()
+
 	for _, manga := range mangaList {
 		id := manga.Links[linkKey]
 		if id != "" {
