@@ -71,29 +71,43 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bool) {
 	startProcessing := time.Now()
-	mangaList := internal.GetAllManga()
 
-	var corpusTag []string
-	var corpusDesc []string
-	var corpusDescLength []int
-
-	debugMangaIds := map[string]bool{
-		"f7888782-0727-49b0-95ec-a3530c70f83b": true,
-		"e56a163f-1a4c-400b-8c1d-6cb98e63ce04": true,
-		"ee0df4ab-1e8d-49b9-9404-da9dcb11a32a": true,
-		"32d76d19-8a05-4db0-9fc2-e0b0648fe9d0": true,
-		"d46d9573-2ad9-45b2-9b6d-45f95452d1c0": true,
-		"e78a489b-6632-4d61-b00b-5206f5b8b22b": true,
-		"58bc83a0-1808-484e-88b9-17e167469e23": true,
-		"0fa5dab2-250a-4f69-bd15-9ceea54176fa": true,
-	}
+	// 1. Filter and Corpus Construction
+	mangaList, corpusTag, corpusDesc, corpusDescLength := buildCorpus(internal.GetAllManga())
+	mangaCount := len(mangaList)
 
 	if !debugMode {
 		DeleteSimilarDB()
 	}
 
+	// 2. Vector Building
+	fmt.Println("Fitting models...")
+	lsiTagCSCWeighted := buildTagVectors(corpusTag)
+	lsiDescCSC := buildDescriptionVectors(corpusDesc)
+
+	fmt.Println("Caching vectors...")
+	tagVectors := cacheVectors(lsiTagCSCWeighted, mangaCount)
+	descVectors := cacheVectors(lsiDescCSC, mangaCount)
+
+	// 3. Language Bitmask Pre-calculation
+	langMasks := buildLanguageMasks(mangaList)
+
+	// 4. Concurrent Processing
+	runConcurrentProcessing(mangaList, tagVectors, descVectors, corpusDescLength, langMasks, debugMode, skippedMode, verbose, threads)
+
+	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
+}
+
+// Helper functions
+
+func buildCorpus(allManga []internal.Manga) ([]internal.Manga, []string, []string, []int) {
 	fmt.Println("Begin loading into corpus")
-	for _, manga := range mangaList {
+	var validManga []internal.Manga
+	var corpusTag []string
+	var corpusDesc []string
+	var corpusDescLength []int
+
+	for _, manga := range allManga {
 		if manga.Title == nil || manga.Description == nil {
 			continue
 		}
@@ -115,22 +129,18 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}
 		descText += similar.CleanDescription((*manga.Description)["en"])
 
+		validManga = append(validManga, manga)
 		corpusTag = append(corpusTag, tagText)
 		corpusDesc = append(corpusDesc, descText)
 		corpusDescLength = append(corpusDescLength, len(strings.Split(descText, " ")))
 	}
+	return validManga, corpusTag, corpusDesc, corpusDescLength
+}
 
+func buildTagVectors(corpusTag []string) *sparse.CSC {
 	lsiTagVectoriser := nlp.NewCountVectoriser([]string{}...)
 	lsiPipelineTag := nlp.NewPipeline(lsiTagVectoriser)
 
-	stopWordsStemmed := append([]string(nil), similar.StopWords...)
-	stemmer.StemMultipleMutate(&stopWordsStemmed)
-	for i := range stopWordsStemmed {
-		stopWordsStemmed[i] = strings.ToLower(stopWordsStemmed[i])
-	}
-	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(stopWordsStemmed...), nlp.NewTfidfTransformer())
-
-	fmt.Println("Fitting models...")
 	lsiTag, _ := lsiPipelineTag.FitTransform(corpusTag...)
 
 	vocabularyInverse := map[int]string{}
@@ -157,20 +167,29 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 			}
 		}
 	}
+	return lsiTagCSCWeighted
+}
 
-	lsiDesc, _ := lsiPipelineDescription.FitTransform(corpusDesc...)
-	lsiDescCSC := lsiDesc.(sparse.TypeConverter).ToCSC()
-
-	fmt.Println("Caching vectors...")
-	mangaCount := len(mangaList)
-	tagVectors := make([]mat.Vector, mangaCount)
-	descVectors := make([]mat.Vector, mangaCount)
-	for i := 0; i < mangaCount; i++ {
-		tagVectors[i] = lsiTagCSCWeighted.ColView(i)
-		descVectors[i] = lsiDescCSC.ColView(i)
+func buildDescriptionVectors(corpusDesc []string) *sparse.CSC {
+	stopWordsStemmed := append([]string(nil), similar.StopWords...)
+	stemmer.StemMultipleMutate(&stopWordsStemmed)
+	for i := range stopWordsStemmed {
+		stopWordsStemmed[i] = strings.ToLower(stopWordsStemmed[i])
 	}
+	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(stopWordsStemmed...), nlp.NewTfidfTransformer())
+	lsiDesc, _ := lsiPipelineDescription.FitTransform(corpusDesc...)
+	return lsiDesc.(sparse.TypeConverter).ToCSC()
+}
 
-	// Language Bitmask Pre-calculation
+func cacheVectors(matrix *sparse.CSC, count int) []mat.Vector {
+	vectors := make([]mat.Vector, count)
+	for i := 0; i < count; i++ {
+		vectors[i] = matrix.ColView(i)
+	}
+	return vectors
+}
+
+func buildLanguageMasks(mangaList []internal.Manga) []uint64 {
 	uniqueLangs := make(map[string]uint64)
 	nextBit := 0
 	for _, m := range mangaList {
@@ -196,7 +215,22 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}
 		langMasks[i] = mask
 	}
+	return langMasks
+}
 
+var debugMangaIds = map[string]bool{
+	"f7888782-0727-49b0-95ec-a3530c70f83b": true,
+	"e56a163f-1a4c-400b-8c1d-6cb98e63ce04": true,
+	"ee0df4ab-1e8d-49b9-9404-da9dcb11a32a": true,
+	"32d76d19-8a05-4db0-9fc2-e0b0648fe9d0": true,
+	"d46d9573-2ad9-45b2-9b6d-45f95452d1c0": true,
+	"e78a489b-6632-4d61-b00b-5206f5b8b22b": true,
+	"58bc83a0-1808-484e-88b9-17e167469e23": true,
+	"0fa5dab2-250a-4f69-bd15-9ceea54176fa": true,
+}
+
+func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors []mat.Vector, corpusDescLength []int, langMasks []uint64, debugMode, skippedMode bool, verbose bool, threads int) {
+	mangaCount := len(mangaList)
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
 	var wg sync.WaitGroup
@@ -211,7 +245,6 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}()
 	}
 
-	// --- FIXED PROGRESS BAR ---
 	go func() {
 		processed := 0
 		startTime := time.Now()
@@ -237,8 +270,6 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	close(jobs)
 	wg.Wait()
 	close(progressChan)
-
-	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
 func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
