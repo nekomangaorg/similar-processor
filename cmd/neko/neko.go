@@ -33,45 +33,14 @@ func runNeko(command *cobra.Command, args []string) {
 	for _, manga := range mangaList {
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
-		generic := getGeneric(internal.TableAnilist, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.ANILIST = generic.ID
-		}
-
-		generic = getGeneric(internal.TableAnimePlanet, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.ANIMEPLANET = generic.ID
-		}
-
-		generic = getGeneric(internal.TableBookWalker, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.BOOKWALKER = generic.ID
-		}
-
-		generic = getGeneric(internal.TableKitsu, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.KITSU = generic.ID
-		}
-
-		generic = getGeneric(internal.TableMyanimelist, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.MYANIMELIST = generic.ID
-		}
-
-		generic = getGeneric(internal.TableMangaupdates, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.MANGAUPDATES = generic.ID
-		}
-
-		generic = getGeneric(internal.TableMangaupdatesNewId, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.MANGAUPDATES_NEW = generic.ID
-		}
-
-		generic = getGeneric(internal.TableNovelUpdates, manga.Id)
-		if generic.UUID != "" {
-			nekoEntry.NOVEL_UPDATES = generic.ID
-		}
+		populateField(internal.TableAnilist, manga.Id, &nekoEntry.ANILIST)
+		populateField(internal.TableAnimePlanet, manga.Id, &nekoEntry.ANIMEPLANET)
+		populateField(internal.TableBookWalker, manga.Id, &nekoEntry.BOOKWALKER)
+		populateField(internal.TableKitsu, manga.Id, &nekoEntry.KITSU)
+		populateField(internal.TableMyanimelist, manga.Id, &nekoEntry.MYANIMELIST)
+		populateField(internal.TableMangaupdates, manga.Id, &nekoEntry.MANGAUPDATES)
+		populateField(internal.TableMangaupdatesNewId, manga.Id, &nekoEntry.MANGAUPDATES_NEW)
+		populateField(internal.TableNovelUpdates, manga.Id, &nekoEntry.NOVEL_UPDATES)
 
 		insertNekoEntry(tx, nekoEntry)
 	}
@@ -128,4 +97,11 @@ func getGeneric(table string, uuid string) internal.DbGeneric {
 func insertNekoEntry(tx *sql.Tx, nekoEntry internal.DbNeko) {
 	_, err := tx.Exec("INSERT INTO "+internal.TableNekoMappings+" (mdex, al, ap, bw, mu, mu_new, nu, kt , mal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
 	internal.CheckErr(err)
+}
+
+func populateField(table string, uuid string, target *string) {
+	generic := getGeneric(table, uuid)
+	if generic.UUID != "" {
+		*target = generic.ID
+	}
 }
