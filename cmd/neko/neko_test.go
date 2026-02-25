@@ -26,12 +26,16 @@ func TestProcessMangaList(t *testing.T) {
 	mangaList := []internal.Manga{
 		{Id: "uuid-1"},
 	}
-	// Use nil for maps not being tested, they should be treated as empty
-	anilistMap := map[string]string{"uuid-1": "al-1"}
 
-	tx, _ := outputDB.Begin()
+	mappings := make(map[string]map[string]string)
+	mappings[internal.TableAnilist] = map[string]string{"uuid-1": "al-1"}
+
+	tx, err := outputDB.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
 	// Pass nil for other maps
-	processMangaList(tx, mangaList, anilistMap, nil, nil, nil, nil, nil, nil, nil)
+	processMangaList(tx, mangaList, mappings)
 	err = tx.Commit()
 	if err != nil {
 		t.Fatalf("Failed to commit transaction: %v", err)

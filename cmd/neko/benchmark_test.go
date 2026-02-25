@@ -42,7 +42,10 @@ func BenchmarkNekoExport(b *testing.B) {
 
 	stmtMap := make(map[string]*sql.Stmt)
 	for _, table := range tables {
-		stmt, _ := internal.DB.Prepare("INSERT INTO " + table + " (UUID, ID) VALUES (?, ?)")
+		stmt, err := internal.DB.Prepare("INSERT INTO " + table + " (UUID, ID) VALUES (?, ?)")
+		if err != nil {
+			b.Fatalf("Failed to prepare statement for table %s: %v", table, err)
+		}
 		stmtMap[table] = stmt
 		defer stmt.Close()
 	}
@@ -75,19 +78,23 @@ func BenchmarkNekoExport(b *testing.B) {
 	}
 
 	// Load mappings for benchmark
-	anilistMap := getAllMappings(internal.TableAnilist)
-	animePlanetMap := getAllMappings(internal.TableAnimePlanet)
-	bookwalkerMap := getAllMappings(internal.TableBookWalker)
-	kitsuMap := getAllMappings(internal.TableKitsu)
-	malMap := getAllMappings(internal.TableMyanimelist)
-	mangaupdatesMap := getAllMappings(internal.TableMangaupdates)
-	mangaupdatesNewMap := getAllMappings(internal.TableMangaupdatesNewId)
-	novelUpdatesMap := getAllMappings(internal.TableNovelUpdates)
+	mappings := make(map[string]map[string]string)
+	mappings[internal.TableAnilist] = getAllMappings(internal.TableAnilist)
+	mappings[internal.TableAnimePlanet] = getAllMappings(internal.TableAnimePlanet)
+	mappings[internal.TableBookWalker] = getAllMappings(internal.TableBookWalker)
+	mappings[internal.TableKitsu] = getAllMappings(internal.TableKitsu)
+	mappings[internal.TableMyanimelist] = getAllMappings(internal.TableMyanimelist)
+	mappings[internal.TableMangaupdates] = getAllMappings(internal.TableMangaupdates)
+	mappings[internal.TableMangaupdatesNewId] = getAllMappings(internal.TableMangaupdatesNewId)
+	mappings[internal.TableNovelUpdates] = getAllMappings(internal.TableNovelUpdates)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tx, _ := outputDB.Begin()
-		processMangaList(tx, mangaList, anilistMap, animePlanetMap, bookwalkerMap, kitsuMap, malMap, mangaupdatesMap, mangaupdatesNewMap, novelUpdatesMap)
+		tx, err := outputDB.Begin()
+		if err != nil {
+			b.Fatalf("Failed to begin transaction: %v", err)
+		}
+		processMangaList(tx, mangaList, mappings)
 		tx.Rollback()
 	}
 }

@@ -29,54 +29,52 @@ func runNeko(command *cobra.Command, args []string) {
 	fmt.Println("Starting neko export")
 	mangaList := internal.GetAllManga()
 
-	anilistMap := getAllMappings(internal.TableAnilist)
-	animePlanetMap := getAllMappings(internal.TableAnimePlanet)
-	bookwalkerMap := getAllMappings(internal.TableBookWalker)
-	kitsuMap := getAllMappings(internal.TableKitsu)
-	malMap := getAllMappings(internal.TableMyanimelist)
-	mangaupdatesMap := getAllMappings(internal.TableMangaupdates)
-	mangaupdatesNewMap := getAllMappings(internal.TableMangaupdatesNewId)
-	novelUpdatesMap := getAllMappings(internal.TableNovelUpdates)
+	mappings := make(map[string]map[string]string)
+	mappings[internal.TableAnilist] = getAllMappings(internal.TableAnilist)
+	mappings[internal.TableAnimePlanet] = getAllMappings(internal.TableAnimePlanet)
+	mappings[internal.TableBookWalker] = getAllMappings(internal.TableBookWalker)
+	mappings[internal.TableKitsu] = getAllMappings(internal.TableKitsu)
+	mappings[internal.TableMyanimelist] = getAllMappings(internal.TableMyanimelist)
+	mappings[internal.TableMangaupdates] = getAllMappings(internal.TableMangaupdates)
+	mappings[internal.TableMangaupdatesNewId] = getAllMappings(internal.TableMangaupdatesNewId)
+	mappings[internal.TableNovelUpdates] = getAllMappings(internal.TableNovelUpdates)
 
 	tx, _ := nekoDb.Begin()
 
-	processMangaList(tx, mangaList, anilistMap, animePlanetMap, bookwalkerMap, kitsuMap, malMap, mangaupdatesMap, mangaupdatesNewMap, novelUpdatesMap)
+	processMangaList(tx, mangaList, mappings)
 
 	err := tx.Commit()
 	internal.CheckErr(err)
 	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
 }
 
-func processMangaList(tx *sql.Tx, mangaList []internal.Manga,
-	anilistMap, animePlanetMap, bookwalkerMap, kitsuMap,
-	malMap, mangaupdatesMap, mangaupdatesNewMap, novelUpdatesMap map[string]string) {
-
+func processMangaList(tx *sql.Tx, mangaList []internal.Manga, mappings map[string]map[string]string) {
 	for _, manga := range mangaList {
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
 
-		if val, ok := anilistMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableAnilist][manga.Id]; ok {
 			nekoEntry.ANILIST = val
 		}
-		if val, ok := animePlanetMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableAnimePlanet][manga.Id]; ok {
 			nekoEntry.ANIMEPLANET = val
 		}
-		if val, ok := bookwalkerMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableBookWalker][manga.Id]; ok {
 			nekoEntry.BOOKWALKER = val
 		}
-		if val, ok := kitsuMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableKitsu][manga.Id]; ok {
 			nekoEntry.KITSU = val
 		}
-		if val, ok := malMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableMyanimelist][manga.Id]; ok {
 			nekoEntry.MYANIMELIST = val
 		}
-		if val, ok := mangaupdatesMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableMangaupdates][manga.Id]; ok {
 			nekoEntry.MANGAUPDATES = val
 		}
-		if val, ok := mangaupdatesNewMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableMangaupdatesNewId][manga.Id]; ok {
 			nekoEntry.MANGAUPDATES_NEW = val
 		}
-		if val, ok := novelUpdatesMap[manga.Id]; ok {
+		if val, ok := mappings[internal.TableNovelUpdates][manga.Id]; ok {
 			nekoEntry.NOVEL_UPDATES = val
 		}
 
@@ -94,6 +92,8 @@ func getAllMappings(table string) map[string]string {
 		var uuid, id string
 		if err := rows.Scan(&uuid, &id); err == nil {
 			mapping[uuid] = id
+		} else {
+			fmt.Printf("Warning: failed to scan row in table %s: %v\n", table, err)
 		}
 	}
 	internal.CheckErr(rows.Err())
