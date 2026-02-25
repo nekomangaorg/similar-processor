@@ -28,26 +28,76 @@ func runNeko(command *cobra.Command, args []string) {
 	nekoDb := createNekoMappingDB()
 	fmt.Println("Starting neko export")
 	mangaList := internal.GetAllManga()
+
+	anilistMap := getAllMappings(internal.TableAnilist)
+	animePlanetMap := getAllMappings(internal.TableAnimePlanet)
+	bookwalkerMap := getAllMappings(internal.TableBookWalker)
+	kitsuMap := getAllMappings(internal.TableKitsu)
+	malMap := getAllMappings(internal.TableMyanimelist)
+	mangaupdatesMap := getAllMappings(internal.TableMangaupdates)
+	mangaupdatesNewMap := getAllMappings(internal.TableMangaupdatesNewId)
+	novelUpdatesMap := getAllMappings(internal.TableNovelUpdates)
+
 	tx, _ := nekoDb.Begin()
 
-	for _, manga := range mangaList {
-		nekoEntry := internal.DbNeko{}
-		nekoEntry.UUID = manga.Id
-		populateField(internal.TableAnilist, manga.Id, &nekoEntry.ANILIST)
-		populateField(internal.TableAnimePlanet, manga.Id, &nekoEntry.ANIMEPLANET)
-		populateField(internal.TableBookWalker, manga.Id, &nekoEntry.BOOKWALKER)
-		populateField(internal.TableKitsu, manga.Id, &nekoEntry.KITSU)
-		populateField(internal.TableMyanimelist, manga.Id, &nekoEntry.MYANIMELIST)
-		populateField(internal.TableMangaupdates, manga.Id, &nekoEntry.MANGAUPDATES)
-		populateField(internal.TableMangaupdatesNewId, manga.Id, &nekoEntry.MANGAUPDATES_NEW)
-		populateField(internal.TableNovelUpdates, manga.Id, &nekoEntry.NOVEL_UPDATES)
-
-		insertNekoEntry(tx, nekoEntry)
-	}
+	processMangaList(tx, mangaList, anilistMap, animePlanetMap, bookwalkerMap, kitsuMap, malMap, mangaupdatesMap, mangaupdatesNewMap, novelUpdatesMap)
 
 	err := tx.Commit()
 	internal.CheckErr(err)
 	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
+}
+
+func processMangaList(tx *sql.Tx, mangaList []internal.Manga,
+	anilistMap, animePlanetMap, bookwalkerMap, kitsuMap,
+	malMap, mangaupdatesMap, mangaupdatesNewMap, novelUpdatesMap map[string]string) {
+
+	for _, manga := range mangaList {
+		nekoEntry := internal.DbNeko{}
+		nekoEntry.UUID = manga.Id
+
+		if val, ok := anilistMap[manga.Id]; ok {
+			nekoEntry.ANILIST = val
+		}
+		if val, ok := animePlanetMap[manga.Id]; ok {
+			nekoEntry.ANIMEPLANET = val
+		}
+		if val, ok := bookwalkerMap[manga.Id]; ok {
+			nekoEntry.BOOKWALKER = val
+		}
+		if val, ok := kitsuMap[manga.Id]; ok {
+			nekoEntry.KITSU = val
+		}
+		if val, ok := malMap[manga.Id]; ok {
+			nekoEntry.MYANIMELIST = val
+		}
+		if val, ok := mangaupdatesMap[manga.Id]; ok {
+			nekoEntry.MANGAUPDATES = val
+		}
+		if val, ok := mangaupdatesNewMap[manga.Id]; ok {
+			nekoEntry.MANGAUPDATES_NEW = val
+		}
+		if val, ok := novelUpdatesMap[manga.Id]; ok {
+			nekoEntry.NOVEL_UPDATES = val
+		}
+
+		insertNekoEntry(tx, nekoEntry)
+	}
+}
+
+func getAllMappings(table string) map[string]string {
+	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + table)
+	internal.CheckErr(err)
+	defer rows.Close()
+
+	mapping := make(map[string]string)
+	for rows.Next() {
+		var uuid, id string
+		if err := rows.Scan(&uuid, &id); err == nil {
+			mapping[uuid] = id
+		}
+	}
+	internal.CheckErr(rows.Err())
+	return mapping
 }
 
 func createNekoMappingDB() *sql.DB {
@@ -82,26 +132,7 @@ func createNekoMappingDB() *sql.DB {
 	return internal.ConnectNekoDB(dbName)
 }
 
-func getGeneric(table string, uuid string) internal.DbGeneric {
-	rows, err := internal.DB.Query("SELECT UUID, ID FROM "+table+" WHERE UUID = ?", uuid)
-	internal.CheckErr(err)
-	defer rows.Close()
-	generic := internal.DbGeneric{}
-	if rows.Next() {
-		rows.Scan(&generic.UUID, &generic.ID)
-	} else {
-	}
-	return generic
-}
-
 func insertNekoEntry(tx *sql.Tx, nekoEntry internal.DbNeko) {
 	_, err := tx.Exec("INSERT INTO "+internal.TableNekoMappings+" (mdex, al, ap, bw, mu, mu_new, nu, kt , mal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
 	internal.CheckErr(err)
-}
-
-func populateField(table string, uuid string, target *string) {
-	generic := getGeneric(table, uuid)
-	if generic.UUID != "" {
-		*target = generic.ID
-	}
 }
