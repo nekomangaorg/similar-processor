@@ -422,6 +422,15 @@ func exportSimilar() {
 	var currentSuffix string
 	var currentFolder string
 
+	closeCurrentResources := func() {
+		if currentWriter != nil {
+			internal.CheckErr(currentWriter.Flush())
+		}
+		if currentFile != nil {
+			internal.CheckErr(currentFile.Close())
+		}
+	}
+
 	for _, sim := range similarList {
 		folder := "data/similar/" + sim.Id[0:2]
 		suffix := sim.Id[0:3]
@@ -432,12 +441,7 @@ func exportSimilar() {
 		}
 
 		if suffix != currentSuffix {
-			if currentWriter != nil {
-				internal.CheckErr(currentWriter.Flush())
-			}
-			if currentFile != nil {
-				currentFile.Close()
-			}
+			closeCurrentResources()
 			var err error
 			currentFile, err = os.OpenFile(folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			internal.CheckErr(err)
@@ -447,12 +451,7 @@ func exportSimilar() {
 		_, err := currentWriter.WriteString(sim.Id + ":::||@!@||:::" + sim.JSON + "\n")
 		internal.CheckErr(err)
 	}
-	if currentWriter != nil {
-		internal.CheckErr(currentWriter.Flush())
-	}
-	if currentFile != nil {
-		currentFile.Close()
-	}
+	closeCurrentResources()
 }
 
 // dotProductSparse calculates the dot product of two sparse vectors.
