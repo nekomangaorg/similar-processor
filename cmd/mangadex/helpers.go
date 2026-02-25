@@ -102,7 +102,7 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 }
 
 func ExistsInDatabase(uuid string) bool {
-	rows, err := internal.DB.Query("SELECT UUID FROM "+internal.TableManga+" WHERE UUID= ?", uuid)
+	rows, err := internal.DB.Query("SELECT 1 FROM "+internal.TableManga+" WHERE UUID= ?", uuid)
 	internal.CheckErr(err)
 	defer rows.Close()
 	return rows.Next()
