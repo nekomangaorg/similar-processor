@@ -162,13 +162,32 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 
 	fmt.Println("Caching vectors...")
 	mangaCount := len(mangaList)
+	// We use *sparse.Vector instead of the generic mat.Vector interface to access
+	// the underlying raw data directly. This avoids interface dispatch overhead
+	// and allows us to implement a custom, highly optimized dot product function.
 	tagVectors := make([]*sparse.Vector, mangaCount)
 	descVectors := make([]*sparse.Vector, mangaCount)
+	// Pre-calculate L2 norms to avoid redundant O(N) calculations inside the O(N^2) loop.
 	tagNorms := make([]float64, mangaCount)
 	descNorms := make([]float64, mangaCount)
 	for i := 0; i < mangaCount; i++ {
-		tagVectors[i] = lsiTagCSCWeighted.ColView(i).(*sparse.Vector)
-		descVectors[i] = lsiDescCSC.ColView(i).(*sparse.Vector)
+		// Type assertion is safe here because we know the underlying type is *sparse.Vector
+		// from the github.com/james-bowman/sparse library's CSC implementation.
+		// However, for robustness, we check and log if it fails.
+		tv, ok := lsiTagCSCWeighted.ColView(i).(*sparse.Vector)
+		if !ok {
+			fmt.Printf("Warning: Type assertion failed for tag vector %d\n", i)
+			continue
+		}
+		tagVectors[i] = tv
+
+		dv, ok := lsiDescCSC.ColView(i).(*sparse.Vector)
+		if !ok {
+			fmt.Printf("Warning: Type assertion failed for desc vector %d\n", i)
+			continue
+		}
+		descVectors[i] = dv
+
 		tagNorms[i] = mat.Norm(tagVectors[i], 2)
 		descNorms[i] = mat.Norm(descVectors[i], 2)
 	}
@@ -423,6 +442,9 @@ func exportSimilar() {
 // It assumes the underlying indices are sorted (which is standard for sparse.Vector).
 // Accessing RawVector() avoids interface overhead and allows O(NNZ) intersection.
 func dotProductSparse(v1, v2 *sparse.Vector) float64 {
+	if v1 == nil || v2 == nil {
+		return 0
+	}
 	d1, i1 := v1.RawVector()
 	d2, i2 := v2.RawVector()
 
