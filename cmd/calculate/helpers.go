@@ -48,7 +48,7 @@ func WriteLineToDebugFile(fileName string, line string) {
 	file.Close()
 }
 
-func ExportMapping(tableName string, fileName string) {
+func exportMapping(tableName string, fileName string) {
 	genericList := getAllGenericFromTable(tableName)
 	exportGeneric(fileName, genericList)
 }
