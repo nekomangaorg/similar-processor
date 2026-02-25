@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"bufio"
 	"container/heap"
 	"fmt"
 	"github.com/caneroj1/stemmer"
@@ -417,21 +418,37 @@ func exportSimilar() {
 	os.MkdirAll("data/similar/", 0755)
 	similarList := getDBSimilar()
 	var currentFile *os.File
+	var currentWriter *bufio.Writer
 	var currentSuffix string
+	var currentFolder string
 
 	for _, sim := range similarList {
 		folder := "data/similar/" + sim.Id[0:2]
 		suffix := sim.Id[0:3]
-		os.MkdirAll(folder, 0755)
+
+		if folder != currentFolder {
+			os.MkdirAll(folder, 0755)
+			currentFolder = folder
+		}
 
 		if suffix != currentSuffix {
+			if currentWriter != nil {
+				internal.CheckErr(currentWriter.Flush())
+			}
 			if currentFile != nil {
 				currentFile.Close()
 			}
-			currentFile, _ = os.OpenFile(folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			var err error
+			currentFile, err = os.OpenFile(folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			internal.CheckErr(err)
+			currentWriter = bufio.NewWriter(currentFile)
 			currentSuffix = suffix
 		}
-		currentFile.WriteString(sim.Id + ":::||@!@||:::" + sim.JSON + "\n")
+		_, err := currentWriter.WriteString(sim.Id + ":::||@!@||:::" + sim.JSON + "\n")
+		internal.CheckErr(err)
+	}
+	if currentWriter != nil {
+		internal.CheckErr(currentWriter.Flush())
 	}
 	if currentFile != nil {
 		currentFile.Close()
