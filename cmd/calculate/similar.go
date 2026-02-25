@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/caneroj1/stemmer"
 	"github.com/james-bowman/nlp"
-	"github.com/james-bowman/nlp/measures/pairwise"
 	"github.com/james-bowman/sparse"
 	_ "github.com/mattn/go-sqlite3"
 	similar "github.com/similar-manga/similar/cmd/calculate/similar_helpers"
@@ -163,11 +162,34 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 
 	fmt.Println("Caching vectors...")
 	mangaCount := len(mangaList)
-	tagVectors := make([]mat.Vector, mangaCount)
-	descVectors := make([]mat.Vector, mangaCount)
+	// We use *sparse.Vector instead of the generic mat.Vector interface to access
+	// the underlying raw data directly. This avoids interface dispatch overhead
+	// and allows us to implement a custom, highly optimized dot product function.
+	tagVectors := make([]*sparse.Vector, mangaCount)
+	descVectors := make([]*sparse.Vector, mangaCount)
+	// Pre-calculate L2 norms to avoid redundant O(N) calculations inside the O(N^2) loop.
+	tagNorms := make([]float64, mangaCount)
+	descNorms := make([]float64, mangaCount)
 	for i := 0; i < mangaCount; i++ {
-		tagVectors[i] = lsiTagCSCWeighted.ColView(i)
-		descVectors[i] = lsiDescCSC.ColView(i)
+		// Type assertion is safe here because we know the underlying type is *sparse.Vector
+		// from the github.com/james-bowman/sparse library's CSC implementation.
+		// However, for robustness, we check and log if it fails.
+		tv, ok := lsiTagCSCWeighted.ColView(i).(*sparse.Vector)
+		if !ok {
+			fmt.Printf("Warning: Type assertion failed for tag vector %d\n", i)
+			continue
+		}
+		tagVectors[i] = tv
+
+		dv, ok := lsiDescCSC.ColView(i).(*sparse.Vector)
+		if !ok {
+			fmt.Printf("Warning: Type assertion failed for desc vector %d\n", i)
+			continue
+		}
+		descVectors[i] = dv
+
+		tagNorms[i] = mat.Norm(tagVectors[i], 2)
+		descNorms[i] = mat.Norm(descVectors[i], 2)
 	}
 
 	// Language Bitmask Pre-calculation
@@ -206,7 +228,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, mangaList, tagVectors, descVectors, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
+				processManga(idx, mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
 			}
 		}()
 	}
@@ -241,7 +263,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
-func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
+func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Vector, tagNorms, descNorms []float64, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
 	defer func() { progress <- struct{}{} }()
 
 	current := list[idx]
@@ -260,6 +282,9 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector
 	heap.Init(h)
 	currentMask := langMasks[idx]
 
+	vTagNorm := tagNorms[idx]
+	vDescNorm := descNorms[idx]
+
 	for i := 0; i < len(list); i++ {
 		if i == idx {
 			continue
@@ -275,8 +300,15 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector
 			continue
 		}
 
-		dTag := pairwise.CosineSimilarity(vTag, tagVecs[i])
-		dDesc := pairwise.CosineSimilarity(vDesc, descVecs[i])
+		var dTag float64
+		if vTagNorm > 0 && tagNorms[i] > 0 {
+			dTag = dotProductSparse(vTag, tagVecs[i]) / (vTagNorm * tagNorms[i])
+		}
+
+		var dDesc float64
+		if vDescNorm > 0 && descNorms[i] > 0 {
+			dDesc = dotProductSparse(vDesc, descVecs[i]) / (vDescNorm * descNorms[i])
+		}
 
 		if math.IsNaN(dTag) || dTag < SimilarityThreshold {
 			dTag = 0
@@ -404,4 +436,35 @@ func exportSimilar() {
 	if currentFile != nil {
 		currentFile.Close()
 	}
+}
+
+// dotProductSparse calculates the dot product of two sparse vectors.
+// It assumes the underlying indices are sorted (which is standard for sparse.Vector).
+// Accessing RawVector() avoids interface overhead and allows O(NNZ) intersection.
+func dotProductSparse(v1, v2 *sparse.Vector) float64 {
+	if v1 == nil || v2 == nil {
+		return 0
+	}
+	d1, i1 := v1.RawVector()
+	d2, i2 := v2.RawVector()
+
+	var dot float64
+	k1, k2 := 0, 0
+	n1, n2 := len(i1), len(i2)
+
+	for k1 < n1 && k2 < n2 {
+		idx1 := i1[k1]
+		idx2 := i2[k2]
+
+		if idx1 < idx2 {
+			k1++
+		} else if idx1 > idx2 {
+			k2++
+		} else {
+			dot += d1[k1] * d2[k2]
+			k1++
+			k2++
+		}
+	}
+	return dot
 }
