@@ -48,43 +48,9 @@ func WriteLineToDebugFile(fileName string, line string) {
 	file.Close()
 }
 
-func ExportAniList() {
-	genericList := getAllGenericFromTable(internal.TableAnilist)
-	exportGeneric("anilist2mdex", genericList)
-}
-
-func ExportAnimePlanet() {
-	genericList := getAllGenericFromTable(internal.TableAnimePlanet)
-	exportGeneric("animeplanet2mdex", genericList)
-}
-func ExportBookWalker() {
-	genericList := getAllGenericFromTable(internal.TableBookWalker)
-	exportGeneric("bookwalker2mdex", genericList)
-}
-
-func ExportMangaUpdates() {
-	genericList := getAllGenericFromTable(internal.TableMangaupdates)
-	exportGeneric("mangaupdates2mdex", genericList)
-}
-
-func ExportNovelUpdates() {
-	genericList := getAllGenericFromTable(internal.TableNovelUpdates)
-	exportGeneric("novelupdates2mdex", genericList)
-}
-
-func ExportKitsu() {
-	genericList := getAllGenericFromTable(internal.TableKitsu)
-	exportGeneric("kitsu2mdex", genericList)
-}
-
-func ExportMyAnimeList() {
-	genericList := getAllGenericFromTable(internal.TableMyanimelist)
-	exportGeneric("myanimelist2mdex", genericList)
-}
-
-func ExportMangaUpdatesNewIds() {
-	genericList := getAllGenericFromTable(internal.TableMangaupdatesNewId)
-	exportGeneric("mangaupdates_new2mdex", genericList)
+func ExportMapping(tableName string, fileName string) {
+	genericList := getAllGenericFromTable(tableName)
+	exportGeneric(fileName, genericList)
 }
 
 func exportGeneric(fileName string, genericList []internal.DbGeneric) {

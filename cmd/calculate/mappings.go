@@ -52,7 +52,7 @@ func calculateAniListMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting AniList mapping file")
-	ExportAniList()
+	ExportMapping(internal.TableAnilist, "anilist2mdex")
 }
 
 func calculateAnimePlanetMapping(mangaList []internal.Manga) {
@@ -69,7 +69,7 @@ func calculateAnimePlanetMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting Anime Planet mapping file")
-	ExportAnimePlanet()
+	ExportMapping(internal.TableAnimePlanet, "animeplanet2mdex")
 }
 
 func calculateBookWalkerMapping(mangaList []internal.Manga) {
@@ -89,7 +89,7 @@ func calculateBookWalkerMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting Book Walker mapping file")
-	ExportBookWalker()
+	ExportMapping(internal.TableBookWalker, "bookwalker2mdex")
 }
 
 func calculateNovelUpdatesMapping(mangaList []internal.Manga) {
@@ -109,7 +109,7 @@ func calculateNovelUpdatesMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting NovelUpdates mapping file")
-	ExportNovelUpdates()
+	ExportMapping(internal.TableNovelUpdates, "novelupdates2mdex")
 }
 
 func calculateKitsuMapping(mangaList []internal.Manga) {
@@ -129,7 +129,7 @@ func calculateKitsuMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting Kitsu mapping file")
-	ExportKitsu()
+	ExportMapping(internal.TableKitsu, "kitsu2mdex")
 }
 
 func calculateMyAnimeListMapping(mangaList []internal.Manga) {
@@ -149,7 +149,7 @@ func calculateMyAnimeListMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting MyAnimeList New Ids file")
-	ExportMyAnimeList()
+	ExportMapping(internal.TableMyanimelist, "myanimelist2mdex")
 }
 
 func calculateMangaUpdatesMapping(mangaList []internal.Manga) {
@@ -169,7 +169,7 @@ func calculateMangaUpdatesMapping(mangaList []internal.Manga) {
 	internal.CheckErr(err)
 
 	fmt.Println("Exporting MangaUpdates mapping file")
-	ExportMangaUpdates()
+	ExportMapping(internal.TableMangaupdates, "mangaupdates2mdex")
 
 }
 
@@ -217,7 +217,7 @@ func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
 	wg.Wait()
 
 	fmt.Println("Exporting MangaUpdates New Ids file")
-	ExportMangaUpdatesNewIds()
+	ExportMapping(internal.TableMangaupdatesNewId, "mangaupdates_new2mdex")
 
 	fmt.Printf("done processing MangaUpdates New Ids (%.2f seconds)!\n", time.Since(start).Seconds())
 }
