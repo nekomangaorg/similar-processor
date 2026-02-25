@@ -93,7 +93,18 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	langMasks := buildLanguageMasks(mangaList)
 
 	// 4. Concurrent Processing
-	runConcurrentProcessing(mangaList, tagVectors, descVectors, corpusDescLength, langMasks, debugMode, skippedMode, verbose, threads)
+	params := &processingParams{
+		mangaList:        mangaList,
+		tagVectors:       tagVectors,
+		descVectors:      descVectors,
+		corpusDescLength: corpusDescLength,
+		langMasks:        langMasks,
+		debugMode:        debugMode,
+		skippedMode:      skippedMode,
+		verbose:          verbose,
+		threads:          threads,
+	}
+	runConcurrentProcessing(params)
 
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
@@ -229,18 +240,30 @@ var debugMangaIds = map[string]bool{
 	"0fa5dab2-250a-4f69-bd15-9ceea54176fa": true,
 }
 
-func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors []mat.Vector, corpusDescLength []int, langMasks []uint64, debugMode, skippedMode bool, verbose bool, threads int) {
-	mangaCount := len(mangaList)
+type processingParams struct {
+	mangaList        []internal.Manga
+	tagVectors       []mat.Vector
+	descVectors      []mat.Vector
+	corpusDescLength []int
+	langMasks        []uint64
+	debugMode        bool
+	skippedMode      bool
+	verbose          bool
+	threads          int
+}
+
+func runConcurrentProcessing(params *processingParams) {
+	mangaCount := len(params.mangaList)
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
 	var wg sync.WaitGroup
 
-	for w := 0; w < threads; w++ {
+	for w := 0; w < params.threads; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, mangaList, tagVectors, descVectors, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
+				processManga(idx, params, progressChan)
 			}
 		}()
 	}
@@ -272,26 +295,26 @@ func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors
 	close(progressChan)
 }
 
-func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
+func processManga(idx int, params *processingParams, progress chan<- struct{}) {
 	defer func() { progress <- struct{}{} }()
 
-	current := list[idx]
-	if debug {
-		if _, ok := debugIds[current.Id]; !ok {
+	current := params.mangaList[idx]
+	if params.debugMode {
+		if _, ok := debugMangaIds[current.Id]; !ok {
 			return
 		}
 	}
-	if descLens[idx] < MinDescriptionWords {
+	if params.corpusDescLength[idx] < MinDescriptionWords {
 		return
 	}
 
-	vTag := tagVecs[idx]
-	vDesc := descVecs[idx]
+	vTag := params.tagVectors[idx]
+	vDesc := params.descVectors[idx]
 	h := &MatchMinHeap{}
 	heap.Init(h)
-	currentMask := langMasks[idx]
+	currentMask := params.langMasks[idx]
 
-	for i := 0; i < len(list); i++ {
+	for i := 0; i < len(params.mangaList); i++ {
 		if i == idx {
 			continue
 		}
@@ -302,12 +325,12 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector
 		// We use a pre-calculated bitmask to quickly skip pairs with no common languages.
 		// If currentMask is 0 (no languages), we don't skip because existing logic allows it.
 		// If (currentMask & targetMask) == 0, it means no common languages (or overflow bits match, which is safe).
-		if currentMask != 0 && (currentMask&langMasks[i]) == 0 {
+		if currentMask != 0 && (currentMask&params.langMasks[i]) == 0 {
 			continue
 		}
 
-		dTag := pairwise.CosineSimilarity(vTag, tagVecs[i])
-		dDesc := pairwise.CosineSimilarity(vDesc, descVecs[i])
+		dTag := pairwise.CosineSimilarity(vTag, params.tagVectors[i])
+		dDesc := pairwise.CosineSimilarity(vDesc, params.descVectors[i])
 
 		if math.IsNaN(dTag) || dTag < SimilarityThreshold {
 			dTag = 0
@@ -328,11 +351,11 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector
 		match := customMatch{ID: i, Distance: score, DistanceTag: dTag, DistanceDesc: dDesc}
 
 		if h.Len() < NumSimToGet {
-			if invalid, _ := invalidForProcessing(match, idx, current, list[i]); !invalid {
+			if invalid, _ := invalidForProcessing(match, idx, current, params.mangaList[i]); !invalid {
 				heap.Push(h, match)
 			}
 		} else if score > (*h)[0].Distance {
-			if invalid, _ := invalidForProcessing(match, idx, current, list[i]); !invalid {
+			if invalid, _ := invalidForProcessing(match, idx, current, params.mangaList[i]); !invalid {
 				heap.Pop(h)
 				heap.Push(h, match)
 			}
@@ -350,14 +373,14 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []mat.Vector
 
 	for h.Len() > 0 {
 		m := heap.Pop(h).(customMatch)
-		target := list[m.ID]
+		target := params.mangaList[m.ID]
 		data.SimilarMatches = append(data.SimilarMatches, internal.SimilarMatch{
 			Id: target.Id, Title: *target.Title, Score: float32(m.Distance / (TagScoreRatio + 1.0)),
 			Languages: target.AvailableTranslatedLanguages,
 		})
 	}
 
-	if !debug {
+	if !params.debugMode {
 		InsertSimilarData(data)
 	}
 }
