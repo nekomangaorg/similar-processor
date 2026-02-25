@@ -37,30 +37,25 @@ func runInit(cmd *cobra.Command, args []string) {
 
 func createMangaDB() {
 	fmt.Println("Creating manga.db")
-	src, err := os.Open("data/default_empty_data.db")
+	err := copyFile("data/default_empty_data.db", "data/data.db")
 	internal.CheckErr(err)
+}
+
+func copyFile(srcPath, dstPath string) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
 	defer src.Close()
-	dst, err := os.Create("data/data.db")
-	internal.CheckErr(err)
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
 	defer dst.Close()
 
-	buf := make([]byte, 1024)
-	for {
-		n, err := src.Read(buf)
-		if err != nil && err != io.EOF {
-			internal.CheckErr(err)
-			break
-		}
-
-		if n == 0 {
-			break
-		}
-
-		if _, err := dst.Write(buf[:n]); err != nil {
-			internal.CheckErr(err)
-			break
-		}
-	}
+	_, err = io.Copy(dst, src)
+	return err
 }
 
 func populateMangaUpdatesMappingDB() {
