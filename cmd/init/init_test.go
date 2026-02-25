@@ -10,7 +10,7 @@ func TestCopyFile(t *testing.T) {
 	// Create a temporary directory for the test
 	tmpDir, err := os.MkdirTemp("", "test-copyfile")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -19,16 +19,16 @@ func TestCopyFile(t *testing.T) {
 
 	content := []byte("hello world")
 	if err := os.WriteFile(srcPath, content, 0644); err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to write to source file: %v", err)
 	}
 
 	if err := copyFile(srcPath, dstPath); err != nil {
-		t.Fatal(err)
+		t.Fatalf("copyFile failed: %v", err)
 	}
 
 	dstContent, err := os.ReadFile(dstPath)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to read destination file: %v", err)
 	}
 
 	if string(dstContent) != string(content) {

@@ -41,7 +41,7 @@ func createMangaDB() {
 	internal.CheckErr(err)
 }
 
-func copyFile(srcPath, dstPath string) error {
+func copyFile(srcPath, dstPath string) (err error) {
 	src, err := os.Open(srcPath)
 	if err != nil {
 		return err
@@ -52,7 +52,11 @@ func copyFile(srcPath, dstPath string) error {
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer func() {
+		if closeErr := dst.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
 	_, err = io.Copy(dst, src)
 	return err
