@@ -8,41 +8,56 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestPopulateField(t *testing.T) {
-	// Setup in-memory DB
-	var err error
-	internal.DB, err = sql.Open("sqlite3", ":memory:")
+func TestProcessMangaList(t *testing.T) {
+	// Setup Output DB
+	outputDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
-		t.Fatalf("Failed to open memory db: %v", err)
+		t.Fatalf("Failed to open output memory db: %v", err)
 	}
-	defer internal.DB.Close()
+	defer outputDB.Close()
 
-	// Create a test table
-	tableName := "TEST_TABLE"
-	_, err = internal.DB.Exec("CREATE TABLE " + tableName + " (UUID TEXT, ID TEXT)")
+	// Create 'mappings' table
+	_, err = outputDB.Exec("CREATE TABLE " + internal.TableNekoMappings + " (mdex TEXT, al TEXT, ap TEXT, bw TEXT, mu TEXT, mu_new TEXT, nu TEXT, kt TEXT, mal TEXT)")
 	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
+		t.Fatalf("Failed to create mappings table: %v", err)
 	}
 
-	// Insert test data
-	testUUID := "test-uuid-123"
-	testID := "test-id-456"
-	_, err = internal.DB.Exec("INSERT INTO "+tableName+" (UUID, ID) VALUES (?, ?)", testUUID, testID)
+	// Setup data
+	mangaList := []internal.Manga{
+		{Id: "uuid-1"},
+	}
+
+	mappings := make(map[string]map[string]string)
+	mappings[internal.TableAnilist] = map[string]string{"uuid-1": "al-1"}
+
+	tx, err := outputDB.Begin()
 	if err != nil {
-		t.Fatalf("Failed to insert data: %v", err)
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
+	// Pass nil for other maps
+	processMangaList(tx, mangaList, mappings)
+	err = tx.Commit()
+	if err != nil {
+		t.Fatalf("Failed to commit transaction: %v", err)
 	}
 
-	// Test case 1: Record exists
-	var targetField string
-	populateField(tableName, testUUID, &targetField)
-	if targetField != testID {
-		t.Errorf("Expected %s, got %s", testID, targetField)
+	// Verify
+	rows, err := outputDB.Query("SELECT mdex, al FROM "+internal.TableNekoMappings+" WHERE mdex = 'uuid-1'")
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
 	}
+	defer rows.Close()
 
-	// Test case 2: Record does not exist
-	targetField = ""
-	populateField(tableName, "non-existent-uuid", &targetField)
-	if targetField != "" {
-		t.Errorf("Expected empty string, got %s", targetField)
+	if rows.Next() {
+		var mdex, al string
+		rows.Scan(&mdex, &al)
+		if mdex != "uuid-1" {
+			t.Errorf("Expected uuid-1, got %s", mdex)
+		}
+		if al != "al-1" {
+			t.Errorf("Expected al-1, got %s", al)
+		}
+	} else {
+		t.Errorf("No rows found")
 	}
 }

@@ -18,6 +18,17 @@ var nekoCmd = &cobra.Command{
 	Run:   runNeko,
 }
 
+var mappingTables = []string{
+	internal.TableAnilist,
+	internal.TableAnimePlanet,
+	internal.TableBookWalker,
+	internal.TableKitsu,
+	internal.TableMyanimelist,
+	internal.TableMangaupdates,
+	internal.TableMangaupdatesNewId,
+	internal.TableNovelUpdates,
+}
+
 func init() {
 	cmd.RootCmd.AddCommand(nekoCmd)
 }
@@ -28,26 +39,64 @@ func runNeko(command *cobra.Command, args []string) {
 	nekoDb := createNekoMappingDB()
 	fmt.Println("Starting neko export")
 	mangaList := internal.GetAllManga()
-	tx, _ := nekoDb.Begin()
 
+	mappings := make(map[string]map[string]string)
+	for _, table := range mappingTables {
+		mappings[table] = getAllMappings(table)
+	}
+
+	tx, err := nekoDb.Begin()
+	internal.CheckErr(err)
+
+	processMangaList(tx, mangaList, mappings)
+
+	err = tx.Commit()
+	internal.CheckErr(err)
+	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
+}
+
+func processMangaList(tx *sql.Tx, mangaList []internal.Manga, mappings map[string]map[string]string) {
 	for _, manga := range mangaList {
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
-		populateField(internal.TableAnilist, manga.Id, &nekoEntry.ANILIST)
-		populateField(internal.TableAnimePlanet, manga.Id, &nekoEntry.ANIMEPLANET)
-		populateField(internal.TableBookWalker, manga.Id, &nekoEntry.BOOKWALKER)
-		populateField(internal.TableKitsu, manga.Id, &nekoEntry.KITSU)
-		populateField(internal.TableMyanimelist, manga.Id, &nekoEntry.MYANIMELIST)
-		populateField(internal.TableMangaupdates, manga.Id, &nekoEntry.MANGAUPDATES)
-		populateField(internal.TableMangaupdatesNewId, manga.Id, &nekoEntry.MANGAUPDATES_NEW)
-		populateField(internal.TableNovelUpdates, manga.Id, &nekoEntry.NOVEL_UPDATES)
+
+		fieldMappings := map[string]*string{
+			internal.TableAnilist:           &nekoEntry.ANILIST,
+			internal.TableAnimePlanet:       &nekoEntry.ANIMEPLANET,
+			internal.TableBookWalker:        &nekoEntry.BOOKWALKER,
+			internal.TableKitsu:             &nekoEntry.KITSU,
+			internal.TableMyanimelist:       &nekoEntry.MYANIMELIST,
+			internal.TableMangaupdates:      &nekoEntry.MANGAUPDATES,
+			internal.TableMangaupdatesNewId: &nekoEntry.MANGAUPDATES_NEW,
+			internal.TableNovelUpdates:      &nekoEntry.NOVEL_UPDATES,
+		}
+
+		for table, field := range fieldMappings {
+			if val, ok := mappings[table][manga.Id]; ok {
+				*field = val
+			}
+		}
 
 		insertNekoEntry(tx, nekoEntry)
 	}
+}
 
-	err := tx.Commit()
+func getAllMappings(table string) map[string]string {
+	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + table)
 	internal.CheckErr(err)
-	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
+	defer rows.Close()
+
+	mapping := make(map[string]string)
+	for rows.Next() {
+		var uuid, id string
+		if err := rows.Scan(&uuid, &id); err == nil {
+			mapping[uuid] = id
+		} else {
+			fmt.Printf("Warning: failed to scan row in table %s: %v\n", table, err)
+		}
+	}
+	internal.CheckErr(rows.Err())
+	return mapping
 }
 
 func createNekoMappingDB() *sql.DB {
@@ -82,26 +131,7 @@ func createNekoMappingDB() *sql.DB {
 	return internal.ConnectNekoDB(dbName)
 }
 
-func getGeneric(table string, uuid string) internal.DbGeneric {
-	rows, err := internal.DB.Query("SELECT UUID, ID FROM "+table+" WHERE UUID = ?", uuid)
-	internal.CheckErr(err)
-	defer rows.Close()
-	generic := internal.DbGeneric{}
-	if rows.Next() {
-		rows.Scan(&generic.UUID, &generic.ID)
-	} else {
-	}
-	return generic
-}
-
 func insertNekoEntry(tx *sql.Tx, nekoEntry internal.DbNeko) {
 	_, err := tx.Exec("INSERT INTO "+internal.TableNekoMappings+" (mdex, al, ap, bw, mu, mu_new, nu, kt , mal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
 	internal.CheckErr(err)
-}
-
-func populateField(table string, uuid string, target *string) {
-	generic := getGeneric(table, uuid)
-	if generic.UUID != "" {
-		*target = generic.ID
-	}
 }
