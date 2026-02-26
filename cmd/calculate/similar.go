@@ -14,6 +14,7 @@ import (
 	"gonum.org/v1/gonum/mat"
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -430,9 +431,10 @@ func exportSimilar() {
 			internal.CheckErr(currentFile.Close())
 		}
 	}
+	defer closeCurrentResources()
 
 	for _, sim := range similarList {
-		folder := "data/similar/" + sim.Id[0:2]
+		folder := filepath.Join("data", "similar", sim.Id[0:2])
 		suffix := sim.Id[0:3]
 
 		if folder != currentFolder {
@@ -443,7 +445,7 @@ func exportSimilar() {
 		if suffix != currentSuffix {
 			closeCurrentResources()
 			var err error
-			currentFile, err = os.OpenFile(folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			currentFile, err = os.OpenFile(filepath.Join(folder, suffix+".html"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			internal.CheckErr(err)
 			currentWriter = bufio.NewWriter(currentFile)
 			currentSuffix = suffix
@@ -451,7 +453,6 @@ func exportSimilar() {
 		_, err := currentWriter.WriteString(sim.Id + ":::||@!@||:::" + sim.JSON + "\n")
 		internal.CheckErr(err)
 	}
-	closeCurrentResources()
 }
 
 // dotProductSparse calculates the dot product of two sparse vectors.
