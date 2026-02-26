@@ -80,7 +80,61 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	startProcessing := time.Now()
 	allManga := internal.GetAllManga()
 
-	debugMangaIds := map[string]bool{
+	if !debugMode {
+		DeleteSimilarDB()
+	}
+
+	data, err := prepareSimilarityData(allManga)
+	if err != nil {
+		log.Fatalf("Preparation failed: %v", err)
+	}
+
+	config := processingConfig{
+		debugMode:     debugMode,
+		skippedMode:   skippedMode,
+		verbose:       verbose,
+		debugMangaIds: getDebugMangaIds(),
+		threads:       threads,
+	}
+
+	runConcurrentProcessing(data, config)
+
+	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", len(data.MangaList), time.Since(startProcessing))
+}
+
+func prepareSimilarityData(allManga []internal.Manga) (*SimilarityData, error) {
+	fmt.Println("Begin loading into corpus")
+	corpus := filterAndBuildCorpus(allManga)
+	mangaCount := len(corpus.MangaList)
+
+	fmt.Println("Fitting models...")
+	lsiTagCSCWeighted, err := buildWeightedTagVectors(corpus.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build tag vectors: %w", err)
+	}
+	lsiDescCSC, err := buildDescriptionVectors(corpus.Descriptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build description vectors: %w", err)
+	}
+
+	fmt.Println("Caching vectors...")
+	tagVectors, descVectors, tagNorms, descNorms := calculateNorms(mangaCount, lsiTagCSCWeighted, lsiDescCSC)
+
+	langMasks := calculateLanguageMasks(corpus.MangaList)
+
+	return &SimilarityData{
+		MangaList:        corpus.MangaList,
+		TagVectors:       tagVectors,
+		DescVectors:      descVectors,
+		TagNorms:         tagNorms,
+		DescNorms:        descNorms,
+		CorpusDescLength: corpus.DescriptionLens,
+		LangMasks:        langMasks,
+	}, nil
+}
+
+func getDebugMangaIds() map[string]bool {
+	return map[string]bool{
 		"f7888782-0727-49b0-95ec-a3530c70f83b": true,
 		"e56a163f-1a4c-400b-8c1d-6cb98e63ce04": true,
 		"ee0df4ab-1e8d-49b9-9404-da9dcb11a32a": true,
@@ -90,51 +144,6 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		"58bc83a0-1808-484e-88b9-17e167469e23": true,
 		"0fa5dab2-250a-4f69-bd15-9ceea54176fa": true,
 	}
-
-	if !debugMode {
-		DeleteSimilarDB()
-	}
-
-	fmt.Println("Begin loading into corpus")
-	corpus := filterAndBuildCorpus(allManga)
-	mangaCount := len(corpus.MangaList)
-
-	fmt.Println("Fitting models...")
-	lsiTagCSCWeighted, err := buildWeightedTagVectors(corpus.Tags)
-	if err != nil {
-		log.Fatalf("Failed to build tag vectors: %v", err)
-	}
-	lsiDescCSC, err := buildDescriptionVectors(corpus.Descriptions)
-	if err != nil {
-		log.Fatalf("Failed to build description vectors: %v", err)
-	}
-
-	fmt.Println("Caching vectors...")
-	tagVectors, descVectors, tagNorms, descNorms := calculateNorms(mangaCount, lsiTagCSCWeighted, lsiDescCSC)
-
-	langMasks := calculateLanguageMasks(corpus.MangaList)
-
-	data := &SimilarityData{
-		MangaList:        corpus.MangaList,
-		TagVectors:       tagVectors,
-		DescVectors:      descVectors,
-		TagNorms:         tagNorms,
-		DescNorms:        descNorms,
-		CorpusDescLength: corpus.DescriptionLens,
-		LangMasks:        langMasks,
-	}
-
-	config := processingConfig{
-		debugMode:     debugMode,
-		skippedMode:   skippedMode,
-		verbose:       verbose,
-		debugMangaIds: debugMangaIds,
-		threads:       threads,
-	}
-
-	runConcurrentProcessing(data, config)
-
-	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
 type CorpusData struct {
