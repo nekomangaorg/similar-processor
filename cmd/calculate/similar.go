@@ -107,6 +107,16 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 
 	langMasks := calculateLanguageMasks(mangaList)
 
+	data := &SimilarityData{
+		MangaList:        mangaList,
+		TagVectors:       tagVectors,
+		DescVectors:      descVectors,
+		TagNorms:         tagNorms,
+		DescNorms:        descNorms,
+		CorpusDescLength: corpusDescLength,
+		LangMasks:        langMasks,
+	}
+
 	config := processingConfig{
 		debugMode:     debugMode,
 		skippedMode:   skippedMode,
@@ -115,7 +125,7 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		threads:       threads,
 	}
 
-	runConcurrentProcessing(mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, config)
+	runConcurrentProcessing(data, config)
 
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
@@ -258,6 +268,16 @@ func calculateLanguageMasks(mangaList []internal.Manga) []uint64 {
 	return langMasks
 }
 
+type SimilarityData struct {
+	MangaList        []internal.Manga
+	TagVectors       []*sparse.Vector
+	DescVectors      []*sparse.Vector
+	TagNorms         []float64
+	DescNorms        []float64
+	CorpusDescLength []int
+	LangMasks        []uint64
+}
+
 type processingConfig struct {
 	debugMode     bool
 	skippedMode   bool
@@ -266,8 +286,8 @@ type processingConfig struct {
 	threads       int
 }
 
-func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors []*sparse.Vector, tagNorms, descNorms []float64, corpusDescLength []int, langMasks []uint64, config processingConfig) {
-	mangaCount := len(mangaList)
+func runConcurrentProcessing(data *SimilarityData, config processingConfig) {
+	mangaCount := len(data.MangaList)
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
 	var wg sync.WaitGroup
@@ -277,7 +297,7 @@ func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, config, progressChan)
+				processManga(idx, data, config, progressChan)
 			}
 		}()
 	}
@@ -308,29 +328,29 @@ func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors
 	close(progressChan)
 }
 
-func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Vector, tagNorms, descNorms []float64, descLens []int, langMasks []uint64, config processingConfig, progress chan<- struct{}) {
+func processManga(idx int, data *SimilarityData, config processingConfig, progress chan<- struct{}) {
 	defer func() { progress <- struct{}{} }()
 
-	current := list[idx]
+	current := data.MangaList[idx]
 	if config.debugMode {
 		if _, ok := config.debugMangaIds[current.Id]; !ok {
 			return
 		}
 	}
-	if descLens[idx] < MinDescriptionWords {
+	if data.CorpusDescLength[idx] < MinDescriptionWords {
 		return
 	}
 
-	vTag := tagVecs[idx]
-	vDesc := descVecs[idx]
+	vTag := data.TagVectors[idx]
+	vDesc := data.DescVectors[idx]
 	h := &MatchMinHeap{}
 	heap.Init(h)
-	currentMask := langMasks[idx]
+	currentMask := data.LangMasks[idx]
 
-	vTagNorm := tagNorms[idx]
-	vDescNorm := descNorms[idx]
+	vTagNorm := data.TagNorms[idx]
+	vDescNorm := data.DescNorms[idx]
 
-	for i := 0; i < len(list); i++ {
+	for i := 0; i < len(data.MangaList); i++ {
 		if i == idx {
 			continue
 		}
@@ -341,18 +361,18 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		// We use a pre-calculated bitmask to quickly skip pairs with no common languages.
 		// If currentMask is 0 (no languages), we don't skip because existing logic allows it.
 		// If (currentMask & targetMask) == 0, it means no common languages (or overflow bits match, which is safe).
-		if currentMask != 0 && (currentMask&langMasks[i]) == 0 {
+		if currentMask != 0 && (currentMask&data.LangMasks[i]) == 0 {
 			continue
 		}
 
 		var dTag float64
-		if vTagNorm > 0 && tagNorms[i] > 0 {
-			dTag = dotProductSparse(vTag, tagVecs[i]) / (vTagNorm * tagNorms[i])
+		if vTagNorm > 0 && data.TagNorms[i] > 0 {
+			dTag = dotProductSparse(vTag, data.TagVectors[i]) / (vTagNorm * data.TagNorms[i])
 		}
 
 		var dDesc float64
-		if vDescNorm > 0 && descNorms[i] > 0 {
-			dDesc = dotProductSparse(vDesc, descVecs[i]) / (vDescNorm * descNorms[i])
+		if vDescNorm > 0 && data.DescNorms[i] > 0 {
+			dDesc = dotProductSparse(vDesc, data.DescVectors[i]) / (vDescNorm * data.DescNorms[i])
 		}
 
 		if math.IsNaN(dTag) || dTag < SimilarityThreshold {
@@ -374,11 +394,11 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		match := customMatch{ID: i, Distance: score, DistanceTag: dTag, DistanceDesc: dDesc}
 
 		if h.Len() < NumSimToGet {
-			if invalid, _ := invalidForProcessing(match, idx, current, list[i]); !invalid {
+			if invalid, _ := invalidForProcessing(match, idx, current, data.MangaList[i]); !invalid {
 				heap.Push(h, match)
 			}
 		} else if score > (*h)[0].Distance {
-			if invalid, _ := invalidForProcessing(match, idx, current, list[i]); !invalid {
+			if invalid, _ := invalidForProcessing(match, idx, current, data.MangaList[i]); !invalid {
 				heap.Pop(h)
 				heap.Push(h, match)
 			}
@@ -389,22 +409,22 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		return
 	}
 
-	data := internal.SimilarManga{
+	simData := internal.SimilarManga{
 		Id: current.Id, Title: *current.Title, ContentRating: current.ContentRating,
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
 	for h.Len() > 0 {
 		m := heap.Pop(h).(customMatch)
-		target := list[m.ID]
-		data.SimilarMatches = append(data.SimilarMatches, internal.SimilarMatch{
+		target := data.MangaList[m.ID]
+		simData.SimilarMatches = append(simData.SimilarMatches, internal.SimilarMatch{
 			Id: target.Id, Title: *target.Title, Score: float32(m.Distance / (TagScoreRatio + 1.0)),
 			Languages: target.AvailableTranslatedLanguages,
 		})
 	}
 
 	if !config.debugMode {
-		InsertSimilarData(data)
+		InsertSimilarData(simData)
 	}
 }
 
