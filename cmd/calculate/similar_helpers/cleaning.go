@@ -66,12 +66,12 @@ func CleanDescription(strRaw string) string {
 
 	// Now remove all english tags which are no longer needed
 	for _, tag := range EnglishDescriptionTags {
-		strRaw = strings.ReplaceAll(strRaw, tag, "")
+		strRaw = strings.ReplaceAll(strRaw, strings.ToLower(tag), "")
 	}
 
 	// Next clean the string from any bbcodes
 	for _, tag := range BBCodes {
-		strRaw = strings.ReplaceAll(strRaw, tag, "")
+		strRaw = strings.ReplaceAll(strRaw, strings.ToLower(tag), "")
 	}
 	strRaw = reg02.ReplaceAllString(strRaw, "")
 
