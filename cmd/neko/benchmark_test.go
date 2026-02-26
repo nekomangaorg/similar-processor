@@ -3,6 +3,7 @@ package neko
 import (
 	"database/sql"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/similar-manga/similar/internal"
@@ -81,7 +82,7 @@ func BenchmarkNekoExport(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Failed to begin transaction: %v", err)
 		}
-		processMangaList(tx, mangaList, mappings)
+		processMangaList(tx, slices.Values(mangaList), mappings)
 		tx.Rollback()
 	}
 }

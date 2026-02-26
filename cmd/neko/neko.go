@@ -3,6 +3,7 @@ package neko
 import (
 	"database/sql"
 	"fmt"
+	"iter"
 	"github.com/similar-manga/similar/cmd"
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
@@ -38,7 +39,6 @@ func runNeko(command *cobra.Command, args []string) {
 
 	nekoDb := createNekoMappingDB()
 	fmt.Println("Starting neko export")
-	mangaList := internal.GetAllManga()
 
 	mappings := make(map[string]map[string]string)
 	for _, table := range mappingTables {
@@ -48,15 +48,15 @@ func runNeko(command *cobra.Command, args []string) {
 	tx, err := nekoDb.Begin()
 	internal.CheckErr(err)
 
-	processMangaList(tx, mangaList, mappings)
+	processMangaList(tx, internal.StreamAllManga(), mappings)
 
 	err = tx.Commit()
 	internal.CheckErr(err)
 	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
 }
 
-func processMangaList(tx *sql.Tx, mangaList []internal.Manga, mappings map[string]map[string]string) {
-	for _, manga := range mangaList {
+func processMangaList(tx *sql.Tx, mangaList iter.Seq[internal.Manga], mappings map[string]map[string]string) {
+	for manga := range mangaList {
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
 

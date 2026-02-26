@@ -3,7 +3,7 @@ package internal
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"iter"
 	"log"
 )
 
@@ -46,21 +46,41 @@ func CheckErr(err error) {
 	}
 }
 
-func GetAllManga() []Manga {
-	rows, err := DB.Query("SELECT JSON FROM " + TableManga + " ORDER BY UUID ASC ")
-	defer rows.Close()
-	CheckErr(err)
-
-	var mangaList []Manga
-	for rows.Next() {
-		manga := Manga{}
-		var jsonManga []byte
-		rows.Scan(&jsonManga)
-		err := json.Unmarshal(jsonManga, &manga)
+func StreamAllManga() iter.Seq[Manga] {
+	return func(yield func(Manga) bool) {
+		rows, err := DB.Query("SELECT JSON FROM " + TableManga + " ORDER BY UUID ASC ")
 		if err != nil {
-			fmt.Printf(string(jsonManga))
+			log.Printf("ERROR: failed to query manga: %v", err)
+			return
 		}
-		CheckErr(err)
+		defer rows.Close()
+
+		for rows.Next() {
+			manga := Manga{}
+			var jsonManga []byte
+			err := rows.Scan(&jsonManga)
+			if err != nil {
+				log.Printf("ERROR: failed to scan manga row: %v", err)
+				continue
+			}
+			err = json.Unmarshal(jsonManga, &manga)
+			if err != nil {
+				log.Printf("ERROR: Failed to unmarshal manga JSON, skipping. Data: %s, Error: %v", string(jsonManga), err)
+				continue
+			}
+			if !yield(manga) {
+				return
+			}
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: error iterating manga rows: %v", err)
+		}
+	}
+}
+
+func GetAllManga() []Manga {
+	var mangaList []Manga
+	for manga := range StreamAllManga() {
 		mangaList = append(mangaList, manga)
 	}
 	return mangaList
