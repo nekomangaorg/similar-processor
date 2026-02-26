@@ -29,12 +29,15 @@ const (
 	SimilarityThreshold  = 1e-4
 )
 
-var similarCmd = &cobra.Command{
-	Use:   "similar",
-	Short: "This updates the similar calculations",
-	Long:  `Calculate and update the similar generations for manga entries`,
-	Run:   runSimilar,
-}
+var (
+	similarCmd = &cobra.Command{
+		Use:   "similar",
+		Short: "This updates the similar calculations",
+		Long:  `Calculate and update the similar generations for manga entries`,
+		Run:   runSimilar,
+	}
+	cachedStopWords []string
+)
 
 func init() {
 	calculateCmd.AddCommand(similarCmd)
@@ -43,6 +46,13 @@ func init() {
 	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
 	similarCmd.Flags().IntP("threads", "t", 1000, "Change the batch processing amount")
 	similarCmd.Flags().BoolP("verbose", "v", false, "Print detailed match information")
+
+	// Pre-process stop words once
+	cachedStopWords = append([]string(nil), similar.StopWords...)
+	stemmer.StemMultipleMutate(&cachedStopWords)
+	for i := range cachedStopWords {
+		cachedStopWords[i] = strings.ToLower(cachedStopWords[i])
+	}
 }
 
 func runSimilar(cmd *cobra.Command, args []string) {
@@ -97,16 +107,26 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 
 	langMasks := calculateLanguageMasks(mangaList)
 
-	runConcurrentProcessing(mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, threads)
+	config := processingConfig{
+		debugMode:     debugMode,
+		skippedMode:   skippedMode,
+		verbose:       verbose,
+		debugMangaIds: debugMangaIds,
+		threads:       threads,
+	}
+
+	runConcurrentProcessing(mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, config)
 
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
 func filterAndBuildCorpus(allManga []internal.Manga) ([]internal.Manga, []string, []string, []int) {
-	var mangaList []internal.Manga
-	var corpusTag []string
-	var corpusDesc []string
-	var corpusDescLength []int
+	// Pre-allocate with max possible capacity to avoid reallocations
+	maxSize := len(allManga)
+	mangaList := make([]internal.Manga, 0, maxSize)
+	corpusTag := make([]string, 0, maxSize)
+	corpusDesc := make([]string, 0, maxSize)
+	corpusDescLength := make([]int, 0, maxSize)
 
 	for _, manga := range allManga {
 		if manga.Title == nil || manga.Description == nil {
@@ -175,12 +195,7 @@ func buildWeightedTagVectors(corpusTag []string) *sparse.CSC {
 }
 
 func buildDescriptionVectors(corpusDesc []string) *sparse.CSC {
-	stopWordsStemmed := append([]string(nil), similar.StopWords...)
-	stemmer.StemMultipleMutate(&stopWordsStemmed)
-	for i := range stopWordsStemmed {
-		stopWordsStemmed[i] = strings.ToLower(stopWordsStemmed[i])
-	}
-	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(stopWordsStemmed...), nlp.NewTfidfTransformer())
+	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(cachedStopWords...), nlp.NewTfidfTransformer())
 
 	lsiDesc, _ := lsiPipelineDescription.FitTransform(corpusDesc...)
 	lsiDescCSC := lsiDesc.(sparse.TypeConverter).ToCSC()
@@ -243,18 +258,26 @@ func calculateLanguageMasks(mangaList []internal.Manga) []uint64 {
 	return langMasks
 }
 
-func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors []*sparse.Vector, tagNorms, descNorms []float64, corpusDescLength []int, langMasks []uint64, debugMode, skippedMode, verbose bool, debugMangaIds map[string]bool, threads int) {
+type processingConfig struct {
+	debugMode     bool
+	skippedMode   bool
+	verbose       bool
+	debugMangaIds map[string]bool
+	threads       int
+}
+
+func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors []*sparse.Vector, tagNorms, descNorms []float64, corpusDescLength []int, langMasks []uint64, config processingConfig) {
 	mangaCount := len(mangaList)
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
 	var wg sync.WaitGroup
 
-	for w := 0; w < threads; w++ {
+	for w := 0; w < config.threads; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
+				processManga(idx, mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, config, progressChan)
 			}
 		}()
 	}
@@ -285,12 +308,12 @@ func runConcurrentProcessing(mangaList []internal.Manga, tagVectors, descVectors
 	close(progressChan)
 }
 
-func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Vector, tagNorms, descNorms []float64, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
+func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Vector, tagNorms, descNorms []float64, descLens []int, langMasks []uint64, config processingConfig, progress chan<- struct{}) {
 	defer func() { progress <- struct{}{} }()
 
 	current := list[idx]
-	if debug {
-		if _, ok := debugIds[current.Id]; !ok {
+	if config.debugMode {
+		if _, ok := config.debugMangaIds[current.Id]; !ok {
 			return
 		}
 	}
@@ -380,7 +403,7 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		})
 	}
 
-	if !debug {
+	if !config.debugMode {
 		InsertSimilarData(data)
 	}
 }
