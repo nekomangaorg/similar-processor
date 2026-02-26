@@ -11,7 +11,6 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
-	"log"
 	"math"
 	"os"
 	"strings"
@@ -86,7 +85,8 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 
 	data, err := prepareSimilarityData(allManga)
 	if err != nil {
-		log.Fatalf("Preparation failed: %v", err)
+		fmt.Printf("Preparation failed: %v\n", err)
+		return
 	}
 
 	config := processingConfig{
