@@ -53,6 +53,30 @@ func TestContains(t *testing.T) {
 			needle:   "foo",
 			want:     false,
 		},
+		{
+			name:     "Unicode match",
+			haystack: []string{"Ångström", "Go"},
+			needle:   "ångström",
+			want:     true,
+		},
+		{
+			name:     "Match with whitespace",
+			haystack: []string{" foo ", "bar"},
+			needle:   " FOO ",
+			want:     true,
+		},
+		{
+			name:     "Partial match fail",
+			haystack: []string{"foobar"},
+			needle:   "foo",
+			want:     false,
+		},
+		{
+			name:     "Whitespace mismatch",
+			haystack: []string{" foo "},
+			needle:   "foo",
+			want:     false,
+		},
 	}
 
 	for _, tt := range tests {
