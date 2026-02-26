@@ -95,25 +95,25 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	}
 
 	fmt.Println("Begin loading into corpus")
-	mangaList, corpusTag, corpusDesc, corpusDescLength := filterAndBuildCorpus(allManga)
-	mangaCount := len(mangaList)
+	corpus := filterAndBuildCorpus(allManga)
+	mangaCount := len(corpus.MangaList)
 
 	fmt.Println("Fitting models...")
-	lsiTagCSCWeighted := buildWeightedTagVectors(corpusTag)
-	lsiDescCSC := buildDescriptionVectors(corpusDesc)
+	lsiTagCSCWeighted := buildWeightedTagVectors(corpus.Tags)
+	lsiDescCSC := buildDescriptionVectors(corpus.Descriptions)
 
 	fmt.Println("Caching vectors...")
 	tagVectors, descVectors, tagNorms, descNorms := calculateNorms(mangaCount, lsiTagCSCWeighted, lsiDescCSC)
 
-	langMasks := calculateLanguageMasks(mangaList)
+	langMasks := calculateLanguageMasks(corpus.MangaList)
 
 	data := &SimilarityData{
-		MangaList:        mangaList,
+		MangaList:        corpus.MangaList,
 		TagVectors:       tagVectors,
 		DescVectors:      descVectors,
 		TagNorms:         tagNorms,
 		DescNorms:        descNorms,
-		CorpusDescLength: corpusDescLength,
+		CorpusDescLength: corpus.DescriptionLens,
 		LangMasks:        langMasks,
 	}
 
@@ -130,7 +130,14 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
-func filterAndBuildCorpus(allManga []internal.Manga) ([]internal.Manga, []string, []string, []int) {
+type CorpusData struct {
+	MangaList       []internal.Manga
+	Tags            []string
+	Descriptions    []string
+	DescriptionLens []int
+}
+
+func filterAndBuildCorpus(allManga []internal.Manga) *CorpusData {
 	// Pre-allocate with max possible capacity to avoid reallocations
 	maxSize := len(allManga)
 	mangaList := make([]internal.Manga, 0, maxSize)
@@ -168,7 +175,12 @@ func filterAndBuildCorpus(allManga []internal.Manga) ([]internal.Manga, []string
 		corpusDesc = append(corpusDesc, descText)
 		corpusDescLength = append(corpusDescLength, len(strings.Split(descText, " ")))
 	}
-	return mangaList, corpusTag, corpusDesc, corpusDescLength
+	return &CorpusData{
+		MangaList:       mangaList,
+		Tags:            corpusTag,
+		Descriptions:    corpusDesc,
+		DescriptionLens: corpusDescLength,
+	}
 }
 
 func buildWeightedTagVectors(corpusTag []string) *sparse.CSC {
