@@ -3,7 +3,6 @@ package internal
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"iter"
 	"log"
 )
@@ -50,24 +49,32 @@ func CheckErr(err error) {
 func StreamAllManga() iter.Seq[Manga] {
 	return func(yield func(Manga) bool) {
 		rows, err := DB.Query("SELECT JSON FROM " + TableManga + " ORDER BY UUID ASC ")
-		CheckErr(err)
+		if err != nil {
+			log.Printf("ERROR: failed to query manga: %v", err)
+			return
+		}
 		defer rows.Close()
 
 		for rows.Next() {
 			manga := Manga{}
 			var jsonManga []byte
 			err := rows.Scan(&jsonManga)
-			CheckErr(err)
+			if err != nil {
+				log.Printf("ERROR: failed to scan manga row: %v", err)
+				continue
+			}
 			err = json.Unmarshal(jsonManga, &manga)
 			if err != nil {
-				fmt.Printf(string(jsonManga))
-				CheckErr(err)
+				log.Printf("ERROR: Failed to unmarshal manga JSON, skipping. Data: %s, Error: %v", string(jsonManga), err)
+				continue
 			}
 			if !yield(manga) {
 				return
 			}
 		}
-		CheckErr(rows.Err())
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: error iterating manga rows: %v", err)
+		}
 	}
 }
 
