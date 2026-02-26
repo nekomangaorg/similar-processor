@@ -11,6 +11,7 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
+	"log"
 	"math"
 	"os"
 	"strings"
@@ -29,12 +30,15 @@ const (
 	SimilarityThreshold  = 1e-4
 )
 
-var similarCmd = &cobra.Command{
-	Use:   "similar",
-	Short: "This updates the similar calculations",
-	Long:  `Calculate and update the similar generations for manga entries`,
-	Run:   runSimilar,
-}
+var (
+	similarCmd = &cobra.Command{
+		Use:   "similar",
+		Short: "This updates the similar calculations",
+		Long:  `Calculate and update the similar generations for manga entries`,
+		Run:   runSimilar,
+	}
+	cachedStopWords []string
+)
 
 func init() {
 	calculateCmd.AddCommand(similarCmd)
@@ -43,6 +47,13 @@ func init() {
 	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
 	similarCmd.Flags().IntP("threads", "t", 1000, "Change the batch processing amount")
 	similarCmd.Flags().BoolP("verbose", "v", false, "Print detailed match information")
+
+	// Pre-process stop words once
+	cachedStopWords = append([]string(nil), similar.StopWords...)
+	stemmer.StemMultipleMutate(&cachedStopWords)
+	for i := range cachedStopWords {
+		cachedStopWords[i] = strings.ToLower(cachedStopWords[i])
+	}
 }
 
 func runSimilar(cmd *cobra.Command, args []string) {
@@ -67,11 +78,7 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bool) {
 	startProcessing := time.Now()
-	mangaList := internal.GetAllManga()
-
-	var corpusTag []string
-	var corpusDesc []string
-	var corpusDescLength []int
+	allManga := internal.GetAllManga()
 
 	debugMangaIds := map[string]bool{
 		"f7888782-0727-49b0-95ec-a3530c70f83b": true,
@@ -89,10 +96,68 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	}
 
 	fmt.Println("Begin loading into corpus")
-	for _, manga := range mangaList {
+	corpus := filterAndBuildCorpus(allManga)
+	mangaCount := len(corpus.MangaList)
+
+	fmt.Println("Fitting models...")
+	lsiTagCSCWeighted, err := buildWeightedTagVectors(corpus.Tags)
+	if err != nil {
+		log.Fatalf("Failed to build tag vectors: %v", err)
+	}
+	lsiDescCSC, err := buildDescriptionVectors(corpus.Descriptions)
+	if err != nil {
+		log.Fatalf("Failed to build description vectors: %v", err)
+	}
+
+	fmt.Println("Caching vectors...")
+	tagVectors, descVectors, tagNorms, descNorms := calculateNorms(mangaCount, lsiTagCSCWeighted, lsiDescCSC)
+
+	langMasks := calculateLanguageMasks(corpus.MangaList)
+
+	data := &SimilarityData{
+		MangaList:        corpus.MangaList,
+		TagVectors:       tagVectors,
+		DescVectors:      descVectors,
+		TagNorms:         tagNorms,
+		DescNorms:        descNorms,
+		CorpusDescLength: corpus.DescriptionLens,
+		LangMasks:        langMasks,
+	}
+
+	config := processingConfig{
+		debugMode:     debugMode,
+		skippedMode:   skippedMode,
+		verbose:       verbose,
+		debugMangaIds: debugMangaIds,
+		threads:       threads,
+	}
+
+	runConcurrentProcessing(data, config)
+
+	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
+}
+
+type CorpusData struct {
+	MangaList       []internal.Manga
+	Tags            []string
+	Descriptions    []string
+	DescriptionLens []int
+}
+
+func filterAndBuildCorpus(allManga []internal.Manga) *CorpusData {
+	// Pre-allocate with max possible capacity to avoid reallocations
+	maxSize := len(allManga)
+	mangaList := make([]internal.Manga, 0, maxSize)
+	corpusTag := make([]string, 0, maxSize)
+	corpusDesc := make([]string, 0, maxSize)
+	corpusDescLength := make([]int, 0, maxSize)
+
+	for _, manga := range allManga {
 		if manga.Title == nil || manga.Description == nil {
 			continue
 		}
+
+		mangaList = append(mangaList, manga)
 
 		var tagTextBuilder strings.Builder
 		for _, tag := range manga.Tags {
@@ -117,19 +182,22 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		corpusDesc = append(corpusDesc, descText)
 		corpusDescLength = append(corpusDescLength, len(strings.Split(descText, " ")))
 	}
+	return &CorpusData{
+		MangaList:       mangaList,
+		Tags:            corpusTag,
+		Descriptions:    corpusDesc,
+		DescriptionLens: corpusDescLength,
+	}
+}
 
+func buildWeightedTagVectors(corpusTag []string) (*sparse.CSC, error) {
 	lsiTagVectoriser := nlp.NewCountVectoriser([]string{}...)
 	lsiPipelineTag := nlp.NewPipeline(lsiTagVectoriser)
 
-	stopWordsStemmed := append([]string(nil), similar.StopWords...)
-	stemmer.StemMultipleMutate(&stopWordsStemmed)
-	for i := range stopWordsStemmed {
-		stopWordsStemmed[i] = strings.ToLower(stopWordsStemmed[i])
+	lsiTag, err := lsiPipelineTag.FitTransform(corpusTag...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fit/transform tag corpus: %w", err)
 	}
-	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(stopWordsStemmed...), nlp.NewTfidfTransformer())
-
-	fmt.Println("Fitting models...")
-	lsiTag, _ := lsiPipelineTag.FitTransform(corpusTag...)
 
 	vocabularyInverse := map[int]string{}
 	for k, v := range lsiTagVectoriser.Vocabulary {
@@ -155,24 +223,28 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 			}
 		}
 	}
+	return lsiTagCSCWeighted, nil
+}
 
-	lsiDesc, _ := lsiPipelineDescription.FitTransform(corpusDesc...)
+func buildDescriptionVectors(corpusDesc []string) (*sparse.CSC, error) {
+	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(cachedStopWords...), nlp.NewTfidfTransformer())
+
+	lsiDesc, err := lsiPipelineDescription.FitTransform(corpusDesc...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fit/transform description corpus: %w", err)
+	}
+
 	lsiDescCSC := lsiDesc.(sparse.TypeConverter).ToCSC()
+	return lsiDescCSC, nil
+}
 
-	fmt.Println("Caching vectors...")
-	mangaCount := len(mangaList)
-	// We use *sparse.Vector instead of the generic mat.Vector interface to access
-	// the underlying raw data directly. This avoids interface dispatch overhead
-	// and allows us to implement a custom, highly optimized dot product function.
+func calculateNorms(mangaCount int, lsiTagCSCWeighted, lsiDescCSC *sparse.CSC) ([]*sparse.Vector, []*sparse.Vector, []float64, []float64) {
 	tagVectors := make([]*sparse.Vector, mangaCount)
 	descVectors := make([]*sparse.Vector, mangaCount)
-	// Pre-calculate L2 norms to avoid redundant O(N) calculations inside the O(N^2) loop.
 	tagNorms := make([]float64, mangaCount)
 	descNorms := make([]float64, mangaCount)
+
 	for i := 0; i < mangaCount; i++ {
-		// Type assertion is safe here because we know the underlying type is *sparse.Vector
-		// from the github.com/james-bowman/sparse library's CSC implementation.
-		// However, for robustness, we check and log if it fails.
 		tv, ok := lsiTagCSCWeighted.ColView(i).(*sparse.Vector)
 		if !ok {
 			fmt.Printf("Warning: Type assertion failed for tag vector %d\n", i)
@@ -190,8 +262,10 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		tagNorms[i] = mat.Norm(tagVectors[i], 2)
 		descNorms[i] = mat.Norm(descVectors[i], 2)
 	}
+	return tagVectors, descVectors, tagNorms, descNorms
+}
 
-	// Language Bitmask Pre-calculation
+func calculateLanguageMasks(mangaList []internal.Manga) []uint64 {
 	uniqueLangs := make(map[string]uint64)
 	nextBit := 0
 	for _, m := range mangaList {
@@ -217,28 +291,48 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 		}
 		langMasks[i] = mask
 	}
+	return langMasks
+}
 
+type SimilarityData struct {
+	MangaList        []internal.Manga
+	TagVectors       []*sparse.Vector
+	DescVectors      []*sparse.Vector
+	TagNorms         []float64
+	DescNorms        []float64
+	CorpusDescLength []int
+	LangMasks        []uint64
+}
+
+type processingConfig struct {
+	debugMode     bool
+	skippedMode   bool
+	verbose       bool
+	debugMangaIds map[string]bool
+	threads       int
+}
+
+func runConcurrentProcessing(data *SimilarityData, config processingConfig) {
+	mangaCount := len(data.MangaList)
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
 	var wg sync.WaitGroup
 
-	for w := 0; w < threads; w++ {
+	for w := 0; w < config.threads; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, mangaList, tagVectors, descVectors, tagNorms, descNorms, corpusDescLength, langMasks, debugMode, skippedMode, verbose, debugMangaIds, progressChan)
+				processManga(idx, data, config, progressChan)
 			}
 		}()
 	}
 
-	// --- FIXED PROGRESS BAR ---
 	go func() {
 		processed := 0
 		startTime := time.Now()
 		for range progressChan {
 			processed++
-			// Update every 10 items or at the very end
 			if processed%10 == 0 || processed == mangaCount {
 				elapsed := time.Since(startTime).Seconds()
 				rate := 0.0
@@ -258,33 +352,31 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	close(jobs)
 	wg.Wait()
 	close(progressChan)
-
-	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", mangaCount, time.Since(startProcessing))
 }
 
-func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Vector, tagNorms, descNorms []float64, descLens []int, langMasks []uint64, debug, skipped, verbose bool, debugIds map[string]bool, progress chan<- struct{}) {
+func processManga(idx int, data *SimilarityData, config processingConfig, progress chan<- struct{}) {
 	defer func() { progress <- struct{}{} }()
 
-	current := list[idx]
-	if debug {
-		if _, ok := debugIds[current.Id]; !ok {
+	current := data.MangaList[idx]
+	if config.debugMode {
+		if _, ok := config.debugMangaIds[current.Id]; !ok {
 			return
 		}
 	}
-	if descLens[idx] < MinDescriptionWords {
+	if data.CorpusDescLength[idx] < MinDescriptionWords {
 		return
 	}
 
-	vTag := tagVecs[idx]
-	vDesc := descVecs[idx]
+	vTag := data.TagVectors[idx]
+	vDesc := data.DescVectors[idx]
 	h := &MatchMinHeap{}
 	heap.Init(h)
-	currentMask := langMasks[idx]
+	currentMask := data.LangMasks[idx]
 
-	vTagNorm := tagNorms[idx]
-	vDescNorm := descNorms[idx]
+	vTagNorm := data.TagNorms[idx]
+	vDescNorm := data.DescNorms[idx]
 
-	for i := 0; i < len(list); i++ {
+	for i := 0; i < len(data.MangaList); i++ {
 		if i == idx {
 			continue
 		}
@@ -295,18 +387,18 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		// We use a pre-calculated bitmask to quickly skip pairs with no common languages.
 		// If currentMask is 0 (no languages), we don't skip because existing logic allows it.
 		// If (currentMask & targetMask) == 0, it means no common languages (or overflow bits match, which is safe).
-		if currentMask != 0 && (currentMask&langMasks[i]) == 0 {
+		if currentMask != 0 && (currentMask&data.LangMasks[i]) == 0 {
 			continue
 		}
 
 		var dTag float64
-		if vTagNorm > 0 && tagNorms[i] > 0 {
-			dTag = dotProductSparse(vTag, tagVecs[i]) / (vTagNorm * tagNorms[i])
+		if vTagNorm > 0 && data.TagNorms[i] > 0 {
+			dTag = dotProductSparse(vTag, data.TagVectors[i]) / (vTagNorm * data.TagNorms[i])
 		}
 
 		var dDesc float64
-		if vDescNorm > 0 && descNorms[i] > 0 {
-			dDesc = dotProductSparse(vDesc, descVecs[i]) / (vDescNorm * descNorms[i])
+		if vDescNorm > 0 && data.DescNorms[i] > 0 {
+			dDesc = dotProductSparse(vDesc, data.DescVectors[i]) / (vDescNorm * data.DescNorms[i])
 		}
 
 		if math.IsNaN(dTag) || dTag < SimilarityThreshold {
@@ -328,11 +420,11 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		match := customMatch{ID: i, Distance: score, DistanceTag: dTag, DistanceDesc: dDesc}
 
 		if h.Len() < NumSimToGet {
-			if invalid, _ := invalidForProcessing(match, idx, current, list[i]); !invalid {
+			if invalid, _ := invalidForProcessing(match, idx, current, data.MangaList[i]); !invalid {
 				heap.Push(h, match)
 			}
 		} else if score > (*h)[0].Distance {
-			if invalid, _ := invalidForProcessing(match, idx, current, list[i]); !invalid {
+			if invalid, _ := invalidForProcessing(match, idx, current, data.MangaList[i]); !invalid {
 				heap.Pop(h)
 				heap.Push(h, match)
 			}
@@ -343,22 +435,22 @@ func processManga(idx int, list []internal.Manga, tagVecs, descVecs []*sparse.Ve
 		return
 	}
 
-	data := internal.SimilarManga{
+	simData := internal.SimilarManga{
 		Id: current.Id, Title: *current.Title, ContentRating: current.ContentRating,
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
 	for h.Len() > 0 {
 		m := heap.Pop(h).(customMatch)
-		target := list[m.ID]
-		data.SimilarMatches = append(data.SimilarMatches, internal.SimilarMatch{
+		target := data.MangaList[m.ID]
+		simData.SimilarMatches = append(simData.SimilarMatches, internal.SimilarMatch{
 			Id: target.Id, Title: *target.Title, Score: float32(m.Distance / (TagScoreRatio + 1.0)),
 			Languages: target.AvailableTranslatedLanguages,
 		})
 	}
 
-	if !debug {
-		InsertSimilarData(data)
+	if !config.debugMode {
+		InsertSimilarData(simData)
 	}
 }
 
