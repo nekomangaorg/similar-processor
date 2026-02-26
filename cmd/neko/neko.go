@@ -29,15 +29,20 @@ func runNeko(command *cobra.Command, args []string) {
 	fmt.Println("Starting neko export")
 	mangaList := internal.GetAllManga()
 
-	mappings := make(map[string]map[string]string)
-	mappings[internal.TableAnilist] = getAllMappings(internal.TableAnilist)
-	mappings[internal.TableAnimePlanet] = getAllMappings(internal.TableAnimePlanet)
-	mappings[internal.TableBookWalker] = getAllMappings(internal.TableBookWalker)
-	mappings[internal.TableKitsu] = getAllMappings(internal.TableKitsu)
-	mappings[internal.TableMyanimelist] = getAllMappings(internal.TableMyanimelist)
-	mappings[internal.TableMangaupdates] = getAllMappings(internal.TableMangaupdates)
-	mappings[internal.TableMangaupdatesNewId] = getAllMappings(internal.TableMangaupdatesNewId)
-	mappings[internal.TableNovelUpdates] = getAllMappings(internal.TableNovelUpdates)
+	tables := []string{
+		internal.TableAnilist,
+		internal.TableAnimePlanet,
+		internal.TableBookWalker,
+		internal.TableKitsu,
+		internal.TableMyanimelist,
+		internal.TableMangaupdates,
+		internal.TableMangaupdatesNewId,
+		internal.TableNovelUpdates,
+	}
+	mappings := make(map[string]map[string]string, len(tables))
+	for _, table := range tables {
+		mappings[table] = getAllMappings(table)
+	}
 
 	tx, err := nekoDb.Begin()
 	internal.CheckErr(err)
