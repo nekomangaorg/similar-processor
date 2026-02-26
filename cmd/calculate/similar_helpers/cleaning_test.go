@@ -65,6 +65,31 @@ func TestCleanTitle(t *testing.T) {
 			input:    "Manga Café",
 			expected: "manga caf", // accents are removed
 		},
+		{
+			name:     "Only Symbols",
+			input:    "!@#$%^&*()",
+			expected: "",
+		},
+		{
+			name:     "Only Spaces",
+			input:    "   ",
+			expected: " ",
+		},
+		{
+			name:     "Leading and Trailing Spaces",
+			input:    "  Hello  ",
+			expected: " hello ",
+		},
+		{
+			name:     "Non-ASCII Characters",
+			input:    "Héllo Wörld",
+			expected: "hllo wrld",
+		},
+		{
+			name:     "Only Non-ASCII",
+			input:    "日本語",
+			expected: "",
+		},
 	}
 
 	for _, tt := range tests {
