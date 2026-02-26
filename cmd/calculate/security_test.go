@@ -35,7 +35,8 @@ func TestWriteLineToDebugFilePermissions(t *testing.T) {
 	}
 	mode = info.Mode().Perm()
 	// We want 0600. So check 0077.
-	if mode&0077 != 0 {
-		t.Errorf("Debug file has insecure permissions: %o (expected rw-------)", mode)
+if mode != 0600 {
+	t.Errorf("Debug file has incorrect permissions: %o (expected rw-------)", mode)
+}
 	}
 }
