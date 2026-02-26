@@ -71,7 +71,7 @@ func setupBenchmarkDB(b *testing.B, numManga int) (*sql.DB, []internal.Manga) {
 	return db, mangaList
 }
 
-func BenchmarkFullNekoExport(b *testing.B) {
+func BenchmarkNekoExport(b *testing.B) {
 	// Setup DB with data
 	numManga := 100
 	db, _ := setupBenchmarkDB(b, numManga)
