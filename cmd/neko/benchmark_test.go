@@ -47,7 +47,6 @@ func BenchmarkNekoExport(b *testing.B) {
 			b.Fatalf("Failed to prepare statement for table %s: %v", table, err)
 		}
 		stmtMap[table] = stmt
-		defer stmt.Close()
 	}
 
 	for i := 0; i < numManga; i++ {
@@ -61,6 +60,10 @@ func BenchmarkNekoExport(b *testing.B) {
 				b.Fatalf("Failed to insert data: %v", err)
 			}
 		}
+	}
+
+	for _, stmt := range stmtMap {
+		stmt.Close()
 	}
 
 	// 3. Setup Output DB
