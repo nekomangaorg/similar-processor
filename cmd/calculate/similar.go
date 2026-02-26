@@ -550,7 +550,9 @@ func exportSimilar() {
 				}
 			}
 			if currentFile != nil {
-				currentFile.Close()
+				if err := currentFile.Close(); err != nil {
+					log.Fatal(err)
+				}
 			}
 			f, err := os.OpenFile(folder+"/"+suffix+".html", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
@@ -570,7 +572,9 @@ func exportSimilar() {
 		}
 	}
 	if currentFile != nil {
-		currentFile.Close()
+		if err := currentFile.Close(); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
