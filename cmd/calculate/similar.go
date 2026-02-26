@@ -11,6 +11,7 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
+	"log"
 	"math"
 	"os"
 	"strings"
@@ -99,8 +100,14 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	mangaCount := len(corpus.MangaList)
 
 	fmt.Println("Fitting models...")
-	lsiTagCSCWeighted := buildWeightedTagVectors(corpus.Tags)
-	lsiDescCSC := buildDescriptionVectors(corpus.Descriptions)
+	lsiTagCSCWeighted, err := buildWeightedTagVectors(corpus.Tags)
+	if err != nil {
+		log.Fatalf("Failed to build tag vectors: %v", err)
+	}
+	lsiDescCSC, err := buildDescriptionVectors(corpus.Descriptions)
+	if err != nil {
+		log.Fatalf("Failed to build description vectors: %v", err)
+	}
 
 	fmt.Println("Caching vectors...")
 	tagVectors, descVectors, tagNorms, descNorms := calculateNorms(mangaCount, lsiTagCSCWeighted, lsiDescCSC)
@@ -183,11 +190,14 @@ func filterAndBuildCorpus(allManga []internal.Manga) *CorpusData {
 	}
 }
 
-func buildWeightedTagVectors(corpusTag []string) *sparse.CSC {
+func buildWeightedTagVectors(corpusTag []string) (*sparse.CSC, error) {
 	lsiTagVectoriser := nlp.NewCountVectoriser([]string{}...)
 	lsiPipelineTag := nlp.NewPipeline(lsiTagVectoriser)
 
-	lsiTag, _ := lsiPipelineTag.FitTransform(corpusTag...)
+	lsiTag, err := lsiPipelineTag.FitTransform(corpusTag...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fit/transform tag corpus: %w", err)
+	}
 
 	vocabularyInverse := map[int]string{}
 	for k, v := range lsiTagVectoriser.Vocabulary {
@@ -213,15 +223,19 @@ func buildWeightedTagVectors(corpusTag []string) *sparse.CSC {
 			}
 		}
 	}
-	return lsiTagCSCWeighted
+	return lsiTagCSCWeighted, nil
 }
 
-func buildDescriptionVectors(corpusDesc []string) *sparse.CSC {
+func buildDescriptionVectors(corpusDesc []string) (*sparse.CSC, error) {
 	lsiPipelineDescription := nlp.NewPipeline(nlp.NewCountVectoriser(cachedStopWords...), nlp.NewTfidfTransformer())
 
-	lsiDesc, _ := lsiPipelineDescription.FitTransform(corpusDesc...)
+	lsiDesc, err := lsiPipelineDescription.FitTransform(corpusDesc...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fit/transform description corpus: %w", err)
+	}
+
 	lsiDescCSC := lsiDesc.(sparse.TypeConverter).ToCSC()
-	return lsiDescCSC
+	return lsiDescCSC, nil
 }
 
 func calculateNorms(mangaCount int, lsiTagCSCWeighted, lsiDescCSC *sparse.CSC) ([]*sparse.Vector, []*sparse.Vector, []float64, []float64) {
