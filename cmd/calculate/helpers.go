@@ -27,16 +27,17 @@ func InsertSimilarData(similarData internal.SimilarManga) {
 
 func getDBSimilar() []internal.DbSimilar {
 	rows, err := internal.DB.Query("SELECT UUID, JSON FROM SIMILAR ORDER BY UUID ASC")
-	defer rows.Close()
 	internal.CheckErr(err)
+	defer rows.Close()
 
 	var similarList []internal.DbSimilar
 	for rows.Next() {
 		similar := internal.DbSimilar{}
-		rows.Scan(&similar.Id, &similar.JSON)
+		err = rows.Scan(&similar.Id, &similar.JSON)
 		internal.CheckErr(err)
 		similarList = append(similarList, similar)
 	}
+	internal.CheckErr(rows.Err())
 	return similarList
 }
 
@@ -64,16 +65,17 @@ func exportGeneric(fileName string, genericList []internal.DbGeneric) {
 
 func getAllGenericFromTable(tableName string) []internal.DbGeneric {
 	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + tableName + " ORDER BY UUID asc ")
-	defer rows.Close()
 	internal.CheckErr(err)
+	defer rows.Close()
 
 	var genericList []internal.DbGeneric
 	for rows.Next() {
 		similar := internal.DbGeneric{}
-		rows.Scan(&similar.UUID, &similar.ID)
+		err = rows.Scan(&similar.UUID, &similar.ID)
 		internal.CheckErr(err)
 		genericList = append(genericList, similar)
 	}
+	internal.CheckErr(rows.Err())
 	return genericList
 }
 
