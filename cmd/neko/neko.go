@@ -89,7 +89,7 @@ func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
 	case internal.TableNovelUpdates:
 		nekoEntry.NOVEL_UPDATES = value
 	default:
-		fmt.Printf("Warning: unhandled table in setNekoField: %s\n", table)
+		fmt.Fprintf(os.Stderr, "Warning: unhandled table in setNekoField: %s\n", table)
 	}
 }
 
