@@ -15,13 +15,10 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
-
-var tagRegex = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 const (
 	NumSimToGet          = 20
@@ -99,12 +96,14 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 			continue
 		}
 
-		tagText := ""
+		var tagTextBuilder strings.Builder
 		for _, tag := range manga.Tags {
 			if tag.Name != nil {
-				tagText += tagRegex.ReplaceAllString((*tag.Name)["en"], "") + " "
+				cleanTag((*tag.Name)["en"], &tagTextBuilder)
+				tagTextBuilder.WriteByte(' ')
 			}
 		}
+		tagText := tagTextBuilder.String()
 
 		descText := similar.CleanTitle((*manga.Title)["en"]) + " "
 		for _, altTitle := range manga.AltTitles {
@@ -484,4 +483,12 @@ func dotProductSparse(v1, v2 *sparse.Vector) float64 {
 		}
 	}
 	return dot
+}
+
+func cleanTag(s string, b *strings.Builder) {
+	for _, char := range s {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
+			b.WriteByte(byte(char))
+		}
+	}
 }
