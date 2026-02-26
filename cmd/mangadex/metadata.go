@@ -152,13 +152,18 @@ func collectAllMangaIds() [][]string {
 	dbOffset := 0
 
 	for processing {
-		rows, _ := internal.DB.Query("SELECT UUID FROM " + internal.TableManga + " ORDER BY UUID LIMIT 100 OFFSET " + strconv.Itoa(dbOffset))
+		rows, err := internal.DB.Query("SELECT UUID FROM " + internal.TableManga + " ORDER BY UUID LIMIT 100 OFFSET " + strconv.Itoa(dbOffset))
+		internal.CheckErr(err)
+
 		var mangaIds []string
 		for rows.Next() {
 			var uuid string
-			rows.Scan(&uuid)
+			err = rows.Scan(&uuid)
+			internal.CheckErr(err)
 			mangaIds = append(mangaIds, uuid)
 		}
+		internal.CheckErr(rows.Err())
+		rows.Close()
 
 		if len(mangaIds) == 0 {
 			processing = false
@@ -167,7 +172,6 @@ func collectAllMangaIds() [][]string {
 
 		mangaIdArray = append(mangaIdArray, mangaIds)
 		dbOffset = dbOffset + 100
-		rows.Close()
 	}
 	return mangaIdArray
 }
