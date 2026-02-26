@@ -60,24 +60,36 @@ func processMangaList(tx *sql.Tx, mangaList []internal.Manga, mappings map[strin
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
 
-		fieldMappings := map[string]*string{
-			internal.TableAnilist:           &nekoEntry.ANILIST,
-			internal.TableAnimePlanet:       &nekoEntry.ANIMEPLANET,
-			internal.TableBookWalker:        &nekoEntry.BOOKWALKER,
-			internal.TableKitsu:             &nekoEntry.KITSU,
-			internal.TableMyanimelist:       &nekoEntry.MYANIMELIST,
-			internal.TableMangaupdates:      &nekoEntry.MANGAUPDATES,
-			internal.TableMangaupdatesNewId: &nekoEntry.MANGAUPDATES_NEW,
-			internal.TableNovelUpdates:      &nekoEntry.NOVEL_UPDATES,
-		}
-
-		for table, field := range fieldMappings {
-			if val, ok := mappings[table][manga.Id]; ok {
-				*field = val
+		for table, mapping := range mappings {
+			if val, ok := mapping[manga.Id]; ok {
+				setNekoField(&nekoEntry, table, val)
 			}
 		}
 
 		insertNekoEntry(tx, nekoEntry)
+	}
+}
+
+func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
+	switch table {
+	case internal.TableAnilist:
+		nekoEntry.ANILIST = value
+	case internal.TableAnimePlanet:
+		nekoEntry.ANIMEPLANET = value
+	case internal.TableBookWalker:
+		nekoEntry.BOOKWALKER = value
+	case internal.TableKitsu:
+		nekoEntry.KITSU = value
+	case internal.TableMyanimelist:
+		nekoEntry.MYANIMELIST = value
+	case internal.TableMangaupdates:
+		nekoEntry.MANGAUPDATES = value
+	case internal.TableMangaupdatesNewId:
+		nekoEntry.MANGAUPDATES_NEW = value
+	case internal.TableNovelUpdates:
+		nekoEntry.NOVEL_UPDATES = value
+	default:
+		fmt.Fprintf(os.Stderr, "Warning: unhandled table in setNekoField: %s\n", table)
 	}
 }
 
