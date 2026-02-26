@@ -2,6 +2,7 @@ package neko
 
 import (
 	"database/sql"
+	"slices"
 	"testing"
 
 	"github.com/similar-manga/similar/internal"
@@ -35,7 +36,7 @@ func TestProcessMangaList(t *testing.T) {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
 	// Pass nil for other maps
-	processMangaList(tx, mangaList, mappings)
+	processMangaList(tx, slices.Values(mangaList), mappings)
 	err = tx.Commit()
 	if err != nil {
 		t.Fatalf("Failed to commit transaction: %v", err)
