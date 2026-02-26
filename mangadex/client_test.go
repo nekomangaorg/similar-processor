@@ -63,3 +63,50 @@ func TestContains(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectHeaderAccept(t *testing.T) {
+	tests := []struct {
+		name    string
+		accepts []string
+		want    string
+	}{
+		{
+			name:    "Empty accepts",
+			accepts: []string{},
+			want:    "",
+		},
+		{
+			name:    "Nil accepts",
+			accepts: nil,
+			want:    "",
+		},
+		{
+			name:    "Contains application/json",
+			accepts: []string{"text/plain", "application/json"},
+			want:    "application/json",
+		},
+		{
+			name:    "Contains application/json (case insensitive)",
+			accepts: []string{"text/plain", "APPLICATION/JSON"},
+			want:    "application/json",
+		},
+		{
+			name:    "Does not contain application/json",
+			accepts: []string{"text/plain", "text/html"},
+			want:    "text/plain,text/html",
+		},
+		{
+			name:    "Single item not json",
+			accepts: []string{"text/plain"},
+			want:    "text/plain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := selectHeaderAccept(tt.accepts); got != tt.want {
+				t.Errorf("selectHeaderAccept() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
