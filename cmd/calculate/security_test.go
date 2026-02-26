@@ -24,8 +24,9 @@ func TestWriteLineToDebugFilePermissions(t *testing.T) {
 
 	// We want to ensure group and others have NO permissions (0700)
 	// If any bit in 0077 is set, fail.
-	if mode&0077 != 0 {
-		t.Errorf("Debug directory has insecure permissions: %o (expected rwx------)", mode)
+if mode != 0700 {
+	t.Errorf("Debug directory has incorrect permissions: %o (expected rwx------)", mode)
+}
 	}
 
 	// Check file permissions
