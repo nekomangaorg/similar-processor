@@ -1,8 +1,16 @@
 package calculate
 
 import (
+	"bufio"
 	"container/heap"
 	"fmt"
+	"log"
+	"math"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/caneroj1/stemmer"
 	"github.com/james-bowman/nlp"
 	"github.com/james-bowman/sparse"
@@ -11,11 +19,6 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
-	"math"
-	"os"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -513,25 +516,58 @@ func (h *MatchMinHeap) Pop() interface{} {
 }
 
 func exportSimilar() {
-	os.RemoveAll("data/similar/")
-	os.MkdirAll("data/similar/", 0755)
+	if err := os.RemoveAll("data/similar/"); err != nil {
+		log.Printf("Warning: failed to remove similar dir: %v", err)
+	}
+	if err := os.MkdirAll("data/similar/", 0755); err != nil {
+		log.Fatal(err)
+	}
 	similarList := getDBSimilar()
+
 	var currentFile *os.File
+	var writer *bufio.Writer
 	var currentSuffix string
+	var currentFolder string
 
 	for _, sim := range similarList {
+		if len(sim.Id) < 3 {
+			continue
+		}
 		folder := "data/similar/" + sim.Id[0:2]
 		suffix := sim.Id[0:3]
-		os.MkdirAll(folder, 0755)
+
+		if folder != currentFolder {
+			if err := os.MkdirAll(folder, 0755); err != nil {
+				log.Fatal(err)
+			}
+			currentFolder = folder
+		}
 
 		if suffix != currentSuffix {
+			if writer != nil {
+				if err := writer.Flush(); err != nil {
+					log.Fatal(err)
+				}
+			}
 			if currentFile != nil {
 				currentFile.Close()
 			}
-			currentFile, _ = os.OpenFile(folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.OpenFile(folder+"/"+suffix+".html", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			currentFile = f
+			writer = bufio.NewWriter(currentFile)
 			currentSuffix = suffix
 		}
-		currentFile.WriteString(sim.Id + ":::||@!@||:::" + sim.JSON + "\n")
+		if _, err := writer.WriteString(sim.Id + ":::||@!@||:::" + sim.JSON + "\n"); err != nil {
+			log.Fatal(err)
+		}
+	}
+	if writer != nil {
+		if err := writer.Flush(); err != nil {
+			log.Fatal(err)
+		}
 	}
 	if currentFile != nil {
 		currentFile.Close()
