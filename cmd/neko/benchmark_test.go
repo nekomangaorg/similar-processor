@@ -18,18 +18,7 @@ func BenchmarkNekoExport(b *testing.B) {
 	}
 	defer internal.DB.Close()
 
-	tables := []string{
-		internal.TableAnilist,
-		internal.TableAnimePlanet,
-		internal.TableBookWalker,
-		internal.TableKitsu,
-		internal.TableMyanimelist,
-		internal.TableMangaupdates,
-		internal.TableMangaupdatesNewId,
-		internal.TableNovelUpdates,
-	}
-
-	for _, table := range tables {
+	for _, table := range mappingTables {
 		_, err = internal.DB.Exec("CREATE TABLE " + table + " (UUID TEXT, ID TEXT)")
 		if err != nil {
 			b.Fatalf("Failed to create table %s: %v", table, err)
@@ -41,7 +30,7 @@ func BenchmarkNekoExport(b *testing.B) {
 	mangaList := make([]internal.Manga, numManga)
 
 	stmtMap := make(map[string]*sql.Stmt)
-	for _, table := range tables {
+	for _, table := range mappingTables {
 		stmt, err := internal.DB.Prepare("INSERT INTO " + table + " (UUID, ID) VALUES (?, ?)")
 		if err != nil {
 			b.Fatalf("Failed to prepare statement for table %s: %v", table, err)
@@ -54,7 +43,7 @@ func BenchmarkNekoExport(b *testing.B) {
 		mangaList[i] = internal.Manga{Id: uuid}
 
 		// Insert mappings for each table
-		for _, table := range tables {
+		for _, table := range mappingTables {
 			_, err = stmtMap[table].Exec(uuid, fmt.Sprintf("id-%s-%d", table, i))
 			if err != nil {
 				b.Fatalf("Failed to insert data: %v", err)
@@ -82,7 +71,7 @@ func BenchmarkNekoExport(b *testing.B) {
 
 	// Load mappings for benchmark
 	mappings := make(map[string]map[string]string)
-	for _, table := range tables {
+	for _, table := range mappingTables {
 		mappings[table] = getAllMappings(table)
 	}
 

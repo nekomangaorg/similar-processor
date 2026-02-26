@@ -18,6 +18,17 @@ var nekoCmd = &cobra.Command{
 	Run:   runNeko,
 }
 
+var mappingTables = []string{
+	internal.TableAnilist,
+	internal.TableAnimePlanet,
+	internal.TableBookWalker,
+	internal.TableKitsu,
+	internal.TableMyanimelist,
+	internal.TableMangaupdates,
+	internal.TableMangaupdatesNewId,
+	internal.TableNovelUpdates,
+}
+
 func init() {
 	cmd.RootCmd.AddCommand(nekoCmd)
 }
@@ -29,18 +40,8 @@ func runNeko(command *cobra.Command, args []string) {
 	fmt.Println("Starting neko export")
 	mangaList := internal.GetAllManga()
 
-	tables := []string{
-		internal.TableAnilist,
-		internal.TableAnimePlanet,
-		internal.TableBookWalker,
-		internal.TableKitsu,
-		internal.TableMyanimelist,
-		internal.TableMangaupdates,
-		internal.TableMangaupdatesNewId,
-		internal.TableNovelUpdates,
-	}
-	mappings := make(map[string]map[string]string, len(tables))
-	for _, table := range tables {
+	mappings := make(map[string]map[string]string)
+	for _, table := range mappingTables {
 		mappings[table] = getAllMappings(table)
 	}
 
@@ -59,29 +60,21 @@ func processMangaList(tx *sql.Tx, mangaList []internal.Manga, mappings map[strin
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
 
-		if val, ok := mappings[internal.TableAnilist][manga.Id]; ok {
-			nekoEntry.ANILIST = val
+		fieldMappings := map[string]*string{
+			internal.TableAnilist:           &nekoEntry.ANILIST,
+			internal.TableAnimePlanet:       &nekoEntry.ANIMEPLANET,
+			internal.TableBookWalker:        &nekoEntry.BOOKWALKER,
+			internal.TableKitsu:             &nekoEntry.KITSU,
+			internal.TableMyanimelist:       &nekoEntry.MYANIMELIST,
+			internal.TableMangaupdates:      &nekoEntry.MANGAUPDATES,
+			internal.TableMangaupdatesNewId: &nekoEntry.MANGAUPDATES_NEW,
+			internal.TableNovelUpdates:      &nekoEntry.NOVEL_UPDATES,
 		}
-		if val, ok := mappings[internal.TableAnimePlanet][manga.Id]; ok {
-			nekoEntry.ANIMEPLANET = val
-		}
-		if val, ok := mappings[internal.TableBookWalker][manga.Id]; ok {
-			nekoEntry.BOOKWALKER = val
-		}
-		if val, ok := mappings[internal.TableKitsu][manga.Id]; ok {
-			nekoEntry.KITSU = val
-		}
-		if val, ok := mappings[internal.TableMyanimelist][manga.Id]; ok {
-			nekoEntry.MYANIMELIST = val
-		}
-		if val, ok := mappings[internal.TableMangaupdates][manga.Id]; ok {
-			nekoEntry.MANGAUPDATES = val
-		}
-		if val, ok := mappings[internal.TableMangaupdatesNewId][manga.Id]; ok {
-			nekoEntry.MANGAUPDATES_NEW = val
-		}
-		if val, ok := mappings[internal.TableNovelUpdates][manga.Id]; ok {
-			nekoEntry.NOVEL_UPDATES = val
+
+		for table, field := range fieldMappings {
+			if val, ok := mappings[table][manga.Id]; ok {
+				*field = val
+			}
 		}
 
 		insertNekoEntry(tx, nekoEntry)
