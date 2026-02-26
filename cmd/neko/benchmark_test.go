@@ -82,14 +82,9 @@ func BenchmarkNekoExport(b *testing.B) {
 
 	// Load mappings for benchmark
 	mappings := make(map[string]map[string]string)
-	mappings[internal.TableAnilist] = getAllMappings(internal.TableAnilist)
-	mappings[internal.TableAnimePlanet] = getAllMappings(internal.TableAnimePlanet)
-	mappings[internal.TableBookWalker] = getAllMappings(internal.TableBookWalker)
-	mappings[internal.TableKitsu] = getAllMappings(internal.TableKitsu)
-	mappings[internal.TableMyanimelist] = getAllMappings(internal.TableMyanimelist)
-	mappings[internal.TableMangaupdates] = getAllMappings(internal.TableMangaupdates)
-	mappings[internal.TableMangaupdatesNewId] = getAllMappings(internal.TableMangaupdatesNewId)
-	mappings[internal.TableNovelUpdates] = getAllMappings(internal.TableNovelUpdates)
+	for _, table := range tables {
+		mappings[table] = getAllMappings(table)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

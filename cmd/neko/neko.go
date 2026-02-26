@@ -39,11 +39,12 @@ func runNeko(command *cobra.Command, args []string) {
 	mappings[internal.TableMangaupdatesNewId] = getAllMappings(internal.TableMangaupdatesNewId)
 	mappings[internal.TableNovelUpdates] = getAllMappings(internal.TableNovelUpdates)
 
-	tx, _ := nekoDb.Begin()
+	tx, err := nekoDb.Begin()
+	internal.CheckErr(err)
 
 	processMangaList(tx, mangaList, mappings)
 
-	err := tx.Commit()
+	err = tx.Commit()
 	internal.CheckErr(err)
 	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
 }
