@@ -23,6 +23,10 @@ func TestExportSimilar(t *testing.T) {
 	internal.DB = db
 	defer func() { internal.DB = originalDB }()
 
+	t.Cleanup(func() {
+		os.RemoveAll("data/similar/")
+	})
+
 	_, err = db.Exec("CREATE TABLE SIMILAR (UUID TEXT PRIMARY KEY, JSON BLOB)")
 	if err != nil {
 		t.Fatal(err)
@@ -76,13 +80,13 @@ func TestExportSimilar(t *testing.T) {
 	}
 
 	// Check specifically that 123.html contains BOTH
-	content, _ := os.ReadFile("data/similar/12/123.html")
+	content, err := os.ReadFile("data/similar/12/123.html")
+	if err != nil {
+		t.Fatalf("Failed to read 123.html: %v", err)
+	}
 	if !strings.Contains(string(content), "12345") || !strings.Contains(string(content), "12346") {
 		t.Error("123.html should contain both 12345 and 12346")
 	}
-
-    // Cleanup
-    os.RemoveAll("data/similar/")
 }
 
 func BenchmarkExportSimilar(b *testing.B) {
