@@ -9,38 +9,51 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func BenchmarkNekoExport(b *testing.B) {
-	// 1. Setup internal.DB
-	var err error
-	internal.DB, err = sql.Open("sqlite3", ":memory:")
+func setupBenchmarkDB(b *testing.B, numManga int) (*sql.DB, []internal.Manga) {
+	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open internal memory db: %v", err)
 	}
-	defer internal.DB.Close()
 
+	// Create mapping tables
 	for _, table := range mappingTables {
-		_, err = internal.DB.Exec("CREATE TABLE " + table + " (UUID TEXT, ID TEXT)")
+		_, err = db.Exec("CREATE TABLE " + table + " (UUID TEXT, ID TEXT)")
 		if err != nil {
 			b.Fatalf("Failed to create table %s: %v", table, err)
 		}
 	}
 
-	// 2. Insert sample data
-	numManga := 100 // Simulate 100 manga for the benchmark unit
-	mangaList := make([]internal.Manga, numManga)
+	// Create MANGA table
+	_, err = db.Exec("CREATE TABLE " + internal.TableManga + " (UUID TEXT, JSON TEXT, DATE TEXT)")
+	if err != nil {
+		b.Fatalf("Failed to create table %s: %v", internal.TableManga, err)
+	}
 
+	mangaList := make([]internal.Manga, numManga)
 	stmtMap := make(map[string]*sql.Stmt)
 	for _, table := range mappingTables {
-		stmt, err := internal.DB.Prepare("INSERT INTO " + table + " (UUID, ID) VALUES (?, ?)")
+		stmt, err := db.Prepare("INSERT INTO " + table + " (UUID, ID) VALUES (?, ?)")
 		if err != nil {
 			b.Fatalf("Failed to prepare statement for table %s: %v", table, err)
 		}
 		stmtMap[table] = stmt
 	}
 
+	mangaStmt, err := db.Prepare("INSERT INTO " + internal.TableManga + " (UUID, JSON, DATE) VALUES (?, ?, ?)")
+	if err != nil {
+		b.Fatalf("Failed to prepare statement for table %s: %v", internal.TableManga, err)
+	}
+	defer mangaStmt.Close()
+
 	for i := 0; i < numManga; i++ {
 		uuid := fmt.Sprintf("uuid-%d", i)
+		jsonStr := fmt.Sprintf(`{"id": "%s", "title": {"en": "Title %d"}}`, uuid, i)
 		mangaList[i] = internal.Manga{Id: uuid}
+
+		_, err = mangaStmt.Exec(uuid, jsonStr, "2023-01-01")
+		if err != nil {
+			b.Fatalf("Failed to insert into MANGA: %v", err)
+		}
 
 		// Insert mappings for each table
 		for _, table := range mappingTables {
@@ -55,24 +68,25 @@ func BenchmarkNekoExport(b *testing.B) {
 		stmt.Close()
 	}
 
-	// 3. Setup Output DB
+	return db, mangaList
+}
+
+func BenchmarkFullNekoExport(b *testing.B) {
+	// Setup DB with data
+	numManga := 100
+	db, _ := setupBenchmarkDB(b, numManga)
+	defer db.Close()
+	internal.DB = db
+
 	outputDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open output memory db: %v", err)
 	}
 	defer outputDB.Close()
 
-	// Create 'mappings' table
-	// Schema inferred from insertNekoEntry: (mdex, al, ap, bw, mu, mu_new, nu, kt , mal)
 	_, err = outputDB.Exec("CREATE TABLE " + internal.TableNekoMappings + " (mdex TEXT, al TEXT, ap TEXT, bw TEXT, mu TEXT, mu_new TEXT, nu TEXT, kt TEXT, mal TEXT)")
 	if err != nil {
 		b.Fatalf("Failed to create mappings table: %v", err)
-	}
-
-	// Load mappings for benchmark
-	mappings := make(map[string]map[string]string)
-	for _, table := range mappingTables {
-		mappings[table] = getAllMappings(table)
 	}
 
 	b.ResetTimer()
@@ -81,7 +95,9 @@ func BenchmarkNekoExport(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Failed to begin transaction: %v", err)
 		}
-		processMangaList(tx, mangaList, mappings)
+
+		exportNeko(tx)
+
 		tx.Rollback()
 	}
 }

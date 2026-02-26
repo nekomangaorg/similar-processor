@@ -38,77 +38,76 @@ func runNeko(command *cobra.Command, args []string) {
 
 	nekoDb := createNekoMappingDB()
 	fmt.Println("Starting neko export")
-	mangaList := internal.GetAllManga()
-
-	mappings := make(map[string]map[string]string)
-	for _, table := range mappingTables {
-		mappings[table] = getAllMappings(table)
-	}
 
 	tx, err := nekoDb.Begin()
 	internal.CheckErr(err)
 
-	processMangaList(tx, mangaList, mappings)
+	exportNeko(tx)
 
 	err = tx.Commit()
 	internal.CheckErr(err)
 	fmt.Printf("Finished neko export in %s\n", time.Since(initialStart))
 }
 
-func processMangaList(tx *sql.Tx, mangaList []internal.Manga, mappings map[string]map[string]string) {
-	for _, manga := range mangaList {
-		nekoEntry := internal.DbNeko{}
-		nekoEntry.UUID = manga.Id
+func exportNeko(tx *sql.Tx) {
+	query := fmt.Sprintf(`SELECT
+		m.UUID,
+		al.ID,
+		ap.ID,
+		bw.ID,
+		mu.ID,
+		mun.ID,
+		nu.ID,
+		kt.ID,
+		mal.ID
+	FROM %s m
+	LEFT JOIN %s al ON m.UUID = al.UUID
+	LEFT JOIN %s ap ON m.UUID = ap.UUID
+	LEFT JOIN %s bw ON m.UUID = bw.UUID
+	LEFT JOIN %s mu ON m.UUID = mu.UUID
+	LEFT JOIN %s mun ON m.UUID = mun.UUID
+	LEFT JOIN %s nu ON m.UUID = nu.UUID
+	LEFT JOIN %s kt ON m.UUID = kt.UUID
+	LEFT JOIN %s mal ON m.UUID = mal.UUID
+	ORDER BY m.UUID`,
+		internal.TableManga,
+		internal.TableAnilist,
+		internal.TableAnimePlanet,
+		internal.TableBookWalker,
+		internal.TableMangaupdates,
+		internal.TableMangaupdatesNewId,
+		internal.TableNovelUpdates,
+		internal.TableKitsu,
+		internal.TableMyanimelist)
 
-		for table, mapping := range mappings {
-			if val, ok := mapping[manga.Id]; ok {
-				setNekoField(&nekoEntry, table, val)
-			}
+	rows, err := internal.DB.Query(query)
+	internal.CheckErr(err)
+	defer rows.Close()
+
+	for rows.Next() {
+		var uuid string
+		var al, ap, bw, mu, mun, nu, kt, mal sql.NullString
+
+		if err := rows.Scan(&uuid, &al, &ap, &bw, &mu, &mun, &nu, &kt, &mal); err != nil {
+			fmt.Printf("Warning: failed to scan row: %v\n", err)
+			continue
+		}
+
+		nekoEntry := internal.DbNeko{
+			UUID:             uuid,
+			ANILIST:          al.String,
+			ANIMEPLANET:      ap.String,
+			BOOKWALKER:       bw.String,
+			MANGAUPDATES:     mu.String,
+			MANGAUPDATES_NEW: mun.String,
+			NOVEL_UPDATES:    nu.String,
+			KITSU:            kt.String,
+			MYANIMELIST:      mal.String,
 		}
 
 		insertNekoEntry(tx, nekoEntry)
 	}
-}
-
-func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
-	switch table {
-	case internal.TableAnilist:
-		nekoEntry.ANILIST = value
-	case internal.TableAnimePlanet:
-		nekoEntry.ANIMEPLANET = value
-	case internal.TableBookWalker:
-		nekoEntry.BOOKWALKER = value
-	case internal.TableKitsu:
-		nekoEntry.KITSU = value
-	case internal.TableMyanimelist:
-		nekoEntry.MYANIMELIST = value
-	case internal.TableMangaupdates:
-		nekoEntry.MANGAUPDATES = value
-	case internal.TableMangaupdatesNewId:
-		nekoEntry.MANGAUPDATES_NEW = value
-	case internal.TableNovelUpdates:
-		nekoEntry.NOVEL_UPDATES = value
-	default:
-		fmt.Fprintf(os.Stderr, "Warning: unhandled table in setNekoField: %s\n", table)
-	}
-}
-
-func getAllMappings(table string) map[string]string {
-	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + table)
-	internal.CheckErr(err)
-	defer rows.Close()
-
-	mapping := make(map[string]string)
-	for rows.Next() {
-		var uuid, id string
-		if err := rows.Scan(&uuid, &id); err == nil {
-			mapping[uuid] = id
-		} else {
-			fmt.Printf("Warning: failed to scan row in table %s: %v\n", table, err)
-		}
-	}
 	internal.CheckErr(rows.Err())
-	return mapping
 }
 
 func createNekoMappingDB() *sql.DB {
