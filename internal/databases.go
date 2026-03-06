@@ -46,6 +46,19 @@ func CheckErr(err error) {
 	}
 }
 
+// CountAllManga returns the total number of manga in the database.
+func CountAllManga() int {
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM " + TableManga).Scan(&count)
+	if err != nil {
+		log.Printf("ERROR: failed to get manga count: %v", err)
+		return 0
+	}
+	return count
+}
+
+// StreamAllManga returns an iterator over all manga in the database.
+// This allows processing manga one by one without loading the entire dataset into memory.
 func StreamAllManga() iter.Seq[Manga] {
 	return func(yield func(Manga) bool) {
 		rows, err := DB.Query("SELECT JSON FROM " + TableManga + " ORDER BY UUID ASC ")
@@ -78,6 +91,8 @@ func StreamAllManga() iter.Seq[Manga] {
 	}
 }
 
+// GetAllManga loads all manga into memory.
+// Deprecated: Use StreamAllManga where possible to reduce memory usage.
 func GetAllManga() []Manga {
 	var mangaList []Manga
 	for manga := range StreamAllManga() {

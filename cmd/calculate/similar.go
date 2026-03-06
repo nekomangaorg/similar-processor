@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	similar "github.com/similar-manga/similar/cmd/calculate/similar_helpers"
 	"github.com/similar-manga/similar/internal"
+	"iter"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
 	"math"
@@ -77,13 +78,14 @@ func runSimilar(cmd *cobra.Command, args []string) {
 
 func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bool) {
 	startProcessing := time.Now()
-	allManga := internal.GetAllManga()
+	mangaCount := internal.CountAllManga()
+	allManga := internal.StreamAllManga()
 
 	if !debugMode {
 		DeleteSimilarDB()
 	}
 
-	data, err := prepareSimilarityData(allManga)
+	data, err := prepareSimilarityData(allManga, mangaCount)
 	if err != nil {
 		fmt.Printf("Preparation failed: %v\n", err)
 		return
@@ -102,10 +104,10 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	fmt.Printf("\nCalculated similarities for %d Manga in %s\n\n", len(data.MangaList), time.Since(startProcessing))
 }
 
-func prepareSimilarityData(allManga []internal.Manga) (*SimilarityData, error) {
+func prepareSimilarityData(allManga iter.Seq[internal.Manga], mangaCount int) (*SimilarityData, error) {
 	fmt.Println("Begin loading into corpus")
-	corpus := filterAndBuildCorpus(allManga)
-	mangaCount := len(corpus.MangaList)
+	corpus := filterAndBuildCorpus(allManga, mangaCount)
+	mangaCount = len(corpus.MangaList)
 
 	fmt.Println("Fitting models...")
 	lsiTagCSCWeighted, err := buildWeightedTagVectors(corpus.Tags)
@@ -153,15 +155,14 @@ type CorpusData struct {
 	DescriptionLens []int
 }
 
-func filterAndBuildCorpus(allManga []internal.Manga) *CorpusData {
+func filterAndBuildCorpus(allManga iter.Seq[internal.Manga], maxSize int) *CorpusData {
 	// Pre-allocate with max possible capacity to avoid reallocations
-	maxSize := len(allManga)
 	mangaList := make([]internal.Manga, 0, maxSize)
 	corpusTag := make([]string, 0, maxSize)
 	corpusDesc := make([]string, 0, maxSize)
 	corpusDescLength := make([]int, 0, maxSize)
 
-	for _, manga := range allManga {
+	for manga := range allManga {
 		if manga.Title == nil || manga.Description == nil {
 			continue
 		}
