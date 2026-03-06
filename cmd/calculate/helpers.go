@@ -45,7 +45,7 @@ func WriteLineToDebugFile(fileName string, line string) {
 	os.MkdirAll("debug", 0700)
 file, err := os.OpenFile(filepath.Join("debug", filepath.Base(fileName)+".txt"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	internal.CheckErr(err)
-	file.WriteString(line + "\n")
+internal.CheckErr(file.WriteString(line + "\n"))
 	file.Close()
 }
 
