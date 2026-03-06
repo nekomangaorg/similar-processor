@@ -39,7 +39,6 @@ func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rat
 		base10Id := strconv.FormatInt(idEncoded, 10)
 
 		if muEntryExistsInNewIDDatabase(uuid) {
-			//fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id and Already exists in database\n", index+1, total, uuid, muLink, base10Id)
 			return true
 		}
 
@@ -78,7 +77,6 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 		convertedId := strconv.Itoa(idOriginal)
 
 		if muEntryExistsInNewIDDatabase(uuid) {
-			//	fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id... but was already converted and exists in database\n", index+1, total, uuid, idOriginal)
 			return true
 		}
 
