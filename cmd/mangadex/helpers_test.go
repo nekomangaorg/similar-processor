@@ -55,6 +55,23 @@ func BenchmarkExistsInDatabase(b *testing.B) {
 	}
 }
 
+func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
+	db := setupTestDB()
+	defer db.Close()
+	internal.DB = db
+
+	batchSize := 100
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		start := (i * batchSize) % 1000
+		end := start + batchSize
+		if end > 1000 {
+			end = 1000
+		}
+		GetExistingMangaUUIDs(testUUIDs[start:end])
+	}
+}
+
 func TestExistsInDatabase(t *testing.T) {
 	db := setupTestDB()
 	defer db.Close()
@@ -68,5 +85,27 @@ func TestExistsInDatabase(t *testing.T) {
 	// Test non-existing
 	if ExistsInDatabase("uuid-9999") {
 		t.Error("uuid-9999 should not exist")
+	}
+}
+
+func TestGetExistingMangaUUIDs(t *testing.T) {
+	db := setupTestDB()
+	defer db.Close()
+	internal.DB = db
+
+	uuids := []string{"uuid-1", "uuid-2", "uuid-9999"}
+	existing := GetExistingMangaUUIDs(uuids)
+
+	if !existing["uuid-1"] {
+		t.Error("uuid-1 should exist")
+	}
+	if !existing["uuid-2"] {
+		t.Error("uuid-2 should exist")
+	}
+	if existing["uuid-9999"] {
+		t.Error("uuid-9999 should not exist")
+	}
+	if len(existing) != 2 {
+		t.Errorf("expected 2 existing uuids, got %d", len(existing))
 	}
 }

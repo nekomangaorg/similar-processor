@@ -108,6 +108,33 @@ func ExistsInDatabase(uuid string) bool {
 	return rows.Next()
 }
 
+func GetExistingMangaUUIDs(uuids []string) map[string]bool {
+	if len(uuids) == 0 {
+		return make(map[string]bool)
+	}
+
+	placeholders := make([]string, len(uuids))
+	args := make([]any, len(uuids))
+	for i, uuid := range uuids {
+		placeholders[i] = "?"
+		args[i] = uuid
+	}
+
+	query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (%s)", internal.TableManga, strings.Join(placeholders, ","))
+	rows, err := internal.DB.Query(query, args...)
+	internal.CheckErr(err)
+	defer rows.Close()
+
+	existing := make(map[string]bool)
+	for rows.Next() {
+		var uuid string
+		err := rows.Scan(&uuid)
+		internal.CheckErr(err)
+		existing[uuid] = true
+	}
+	return existing
+}
+
 func UpsertManga(apiManga mangadex.Manga) {
 	jsonManga := ApiMangaToJson(apiManga)
 	currentDate := strings.Split(time.Now().UTC().Format(time.RFC3339), "Z")[0]
