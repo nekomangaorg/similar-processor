@@ -46,6 +46,8 @@ func CheckErr(err error) {
 	}
 }
 
+// StreamAllManga returns an iterator over all manga in the database.
+// This allows processing manga one by one without loading the entire dataset into memory.
 func StreamAllManga() iter.Seq[Manga] {
 	return func(yield func(Manga) bool) {
 		rows, err := DB.Query("SELECT JSON FROM " + TableManga + " ORDER BY UUID ASC ")
@@ -78,6 +80,8 @@ func StreamAllManga() iter.Seq[Manga] {
 	}
 }
 
+// GetAllManga loads all manga into memory.
+// Deprecated: Use StreamAllManga where possible to reduce memory usage.
 func GetAllManga() []Manga {
 	var mangaList []Manga
 	for manga := range StreamAllManga() {
