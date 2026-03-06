@@ -6,6 +6,7 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 func DeleteSimilarDB() {
@@ -42,6 +43,7 @@ func getDBSimilar() []internal.DbSimilar {
 
 func WriteLineToDebugFile(fileName string, line string) {
 	os.MkdirAll("debug", 0700)
+	fileName = filepath.Base(fileName)
 	file, err := os.OpenFile("debug/"+fileName+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	internal.CheckErr(err)
 	file.WriteString(line + "\n")
