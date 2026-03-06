@@ -44,8 +44,15 @@ func runAdd(cmd *cobra.Command, args []string) {
 
 		mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
+		uuids := make([]string, len(mangaList.Data))
+		for i, apiManga := range mangaList.Data {
+			uuids[i] = apiManga.Id
+		}
+
+		existingUUIDs := GetExistingMangaUUIDs(uuids)
+
 		for _, apiManga := range mangaList.Data {
-			if !ExistsInDatabase(apiManga.Id) {
+			if !existingUUIDs[apiManga.Id] {
 				count++
 				UpsertManga(apiManga)
 				fmt.Printf("Inserting manga with ID: %s\n", apiManga.Id)
