@@ -31,11 +31,14 @@ func hasPromoTag(s string) bool {
 		// Quick check for parentheses to fail fast.
 		if s[i] == tag[0] && s[i+tagLen-1] == tag[tagLen-1] {
 			// Case-insensitive check for the content.
-			if (s[i+1]|0x20 == tag[1]) &&
-				(s[i+2]|0x20 == tag[2]) &&
-				(s[i+3]|0x20 == tag[3]) &&
-				(s[i+4]|0x20 == tag[4]) &&
-				(s[i+5]|0x20 == tag[5]) {
+			isMatch := true
+			for j := 1; j < tagLen-1; j++ {
+				if (s[i+j]|0x20) != tag[j] {
+					isMatch = false
+					break
+				}
+			}
+			if isMatch {
 				return true
 			}
 		}
@@ -65,8 +68,10 @@ func NotValidMatch(manga internal.Manga, mangaOther internal.Manga) bool {
 	}
 
 	// Small check for "promo" titles, don't match to promotional titles
-	if !hasPromoTag((*manga.Title)["en"]) && hasPromoTag((*mangaOther.Title)["en"]) {
-		return true
+	if manga.Title != nil && mangaOther.Title != nil {
+		if !hasPromoTag((*manga.Title)["en"]) && hasPromoTag((*mangaOther.Title)["en"]) {
+			return true
+		}
 	}
 
 	// Enforce that our two demographics are the same
