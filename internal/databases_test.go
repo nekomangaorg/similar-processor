@@ -1,12 +1,52 @@
 package internal
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
+
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func TestCheckErr(t *testing.T) {
+	// Test nil error
+	t.Run("nil error", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("CheckErr(nil) panicked: %v", r)
+			}
+		}()
+		CheckErr(nil)
+	})
+
+	// Test non-nil error using a subprocess
+	t.Run("non-nil error", func(t *testing.T) {
+		if os.Getenv("BE_CRASHER") == "1" {
+			CheckErr(errors.New("test error"))
+			return
+		}
+		cmd := exec.Command(os.Args[0], "-test.run=^TestCheckErr/non-nil_error$")
+		cmd.Env = append(os.Environ(), "BE_CRASHER=1")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+
+		if e, ok := err.(*exec.ExitError); ok && !e.Success() {
+			const expectedLog = "test error"
+			if !strings.Contains(stderr.String(), expectedLog) {
+				t.Errorf("expected stderr to contain %q, got %q", expectedLog, stderr.String())
+			}
+			return // Test passed
+		}
+		t.Fatalf("process ran with err %v, want exit status 1. stderr: %s", err, stderr.String())
+	})
+}
 
 func setupDB(b *testing.B) *sql.DB {
 	// Setup in-memory DB
