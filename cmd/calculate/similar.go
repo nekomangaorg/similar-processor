@@ -161,6 +161,7 @@ func filterAndBuildCorpus(allManga []internal.Manga) *CorpusData {
 	corpusDesc := make([]string, 0, maxSize)
 	corpusDescLength := make([]int, 0, maxSize)
 
+	var tagTextBuilder strings.Builder
 	for _, manga := range allManga {
 		if manga.Title == nil || manga.Description == nil {
 			continue
@@ -168,7 +169,7 @@ func filterAndBuildCorpus(allManga []internal.Manga) *CorpusData {
 
 		mangaList = append(mangaList, manga)
 
-		var tagTextBuilder strings.Builder
+		tagTextBuilder.Reset()
 		for _, tag := range manga.Tags {
 			if tag.Name != nil {
 				cleanTag((*tag.Name)["en"], &tagTextBuilder)
@@ -570,9 +571,10 @@ func dotProductSparse(v1, v2 *sparse.Vector) float64 {
 }
 
 func cleanTag(s string, b *strings.Builder) {
-	for _, char := range s {
+	for i := 0; i < len(s); i++ {
+		char := s[i]
 		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
-			b.WriteByte(byte(char))
+			b.WriteByte(char)
 		}
 	}
 }
