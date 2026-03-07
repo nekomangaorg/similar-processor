@@ -152,7 +152,7 @@ func collectAllMangaIds() [][]string {
 	dbOffset := 0
 
 	for processing {
-		rows, err := internal.DB.Query("SELECT UUID FROM " + internal.TableManga + " ORDER BY UUID LIMIT 100 OFFSET " + strconv.Itoa(dbOffset))
+		rows, err := internal.DB.Query("SELECT UUID FROM "+internal.TableManga+" ORDER BY UUID LIMIT 100 OFFSET ?", dbOffset)
 		internal.CheckErr(err)
 
 		var mangaIds []string

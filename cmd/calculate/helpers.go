@@ -64,16 +64,23 @@ func exportGeneric(fileName string, genericList []internal.DbGeneric) {
 }
 
 func getAllGenericFromTable(tableName string) []internal.DbGeneric {
+	switch tableName {
+	case internal.TableAnilist, internal.TableAnimePlanet, internal.TableBookWalker, internal.TableKitsu, internal.TableMyanimelist, internal.TableMangaupdates, internal.TableMangaupdatesNewId, internal.TableNovelUpdates:
+		// OK
+	default:
+		log.Fatalf("getAllGenericFromTable: invalid table name %s", tableName)
+	}
+
 	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + tableName + " ORDER BY UUID asc ")
 	internal.CheckErr(err)
 	defer rows.Close()
 
 	var genericList []internal.DbGeneric
 	for rows.Next() {
-		similar := internal.DbGeneric{}
-		err = rows.Scan(&similar.UUID, &similar.ID)
+		generic := internal.DbGeneric{}
+		err = rows.Scan(&generic.UUID, &generic.ID)
 		internal.CheckErr(err)
-		genericList = append(genericList, similar)
+		genericList = append(genericList, generic)
 	}
 	internal.CheckErr(rows.Err())
 	return genericList
