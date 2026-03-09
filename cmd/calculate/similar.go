@@ -193,7 +193,8 @@ func filterAndBuildCorpus(allManga iter.Seq[internal.Manga]) *CorpusData {
 
 		corpusTag = append(corpusTag, tagText)
 		corpusDesc = append(corpusDesc, descText)
-		corpusDescLength = append(corpusDescLength, len(strings.Split(descText, " ")))
+		// Optimization: Use strings.Count instead of strings.Split to prevent unnecessary allocations
+		corpusDescLength = append(corpusDescLength, strings.Count(descText, " ")+1)
 	}
 	return &CorpusData{
 		MangaList:       mangaList,
