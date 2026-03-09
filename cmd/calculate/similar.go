@@ -196,8 +196,8 @@ func filterAndBuildCorpus(allManga iter.Seq[internal.Manga]) *CorpusData {
 
 		wordCount := 0
 		inWord := false
-		for _, r := range descText {
-			if r == ' ' {
+		for i := 0; i < len(descText); i++ {
+			if descText[i] == ' ' {
 				inWord = false
 			} else if !inWord {
 				wordCount++
