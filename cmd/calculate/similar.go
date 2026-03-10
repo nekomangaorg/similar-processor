@@ -193,7 +193,8 @@ func filterAndBuildCorpus(allManga iter.Seq[internal.Manga]) *CorpusData {
 
 		corpusTag = append(corpusTag, tagText)
 		corpusDesc = append(corpusDesc, descText)
-		corpusDescLength = append(corpusDescLength, len(strings.Split(descText, " ")))
+
+		corpusDescLength = append(corpusDescLength, countWords(descText))
 	}
 	return &CorpusData{
 		MangaList:       mangaList,
@@ -577,6 +578,17 @@ func exportSimilar() {
 			log.Fatal(err)
 		}
 	}
+}
+
+// countWords accurately counts words in a space-separated string without allocations.
+func countWords(s string) int {
+	var count int
+	for i := 0; i < len(s); i++ {
+		if s[i] != ' ' && (i == 0 || s[i-1] == ' ') {
+			count++
+		}
+	}
+	return count
 }
 
 // dotProductSparse calculates the dot product of two sparse vectors.
