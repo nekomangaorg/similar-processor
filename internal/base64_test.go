@@ -90,6 +90,61 @@ func TestDecode(t *testing.T) {
 			input:    "!1",
 			expected: 1, // '!' -> 0*36, '1' -> 1
 		},
+		{
+			name:     "Invalid Base64 characters (+)",
+			input:    "+",
+			expected: 0,
+		},
+		{
+			name:     "Invalid Base64 characters (/)",
+			input:    "/",
+			expected: 0,
+		},
+		{
+			name:     "Invalid Base64 characters (=)",
+			input:    "=",
+			expected: 0,
+		},
+		{
+			name:     "Multiple invalid characters",
+			input:    "!@#$",
+			expected: 0,
+		},
+		{
+			name:     "Non-ASCII characters (ñ)",
+			input:    "ñ",
+			expected: 0, // ñ is multiple bytes in UTF-8, but we treat each byte
+		},
+		{
+			name:     "Non-ASCII characters (本)",
+			input:    "本",
+			expected: 0,
+		},
+		{
+			name:     "Non-ASCII characters (😊)",
+			input:    "😊",
+			expected: 0,
+		},
+		{
+			name:     "Control characters (newline)",
+			input:    "\n",
+			expected: 0,
+		},
+		{
+			name:     "Control characters (tab)",
+			input:    "\t",
+			expected: 0,
+		},
+		{
+			name:     "Length 14 truncated to 12 (exact)",
+			input:    "1234567890AB CD", // length 15
+			expected: Decode("1234567890AB"),
+		},
+		{
+			name:     "Verify length 13 is NOT truncated",
+			input:    "1000000000000",
+			expected: 4738381338321616896,
+		},
 	}
 
 	for _, tt := range tests {
