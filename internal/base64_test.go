@@ -113,7 +113,7 @@ func TestDecode(t *testing.T) {
 		{
 			name:     "Non-ASCII characters (ñ)",
 			input:    "ñ",
-			expected: 0, // ñ is multiple bytes in UTF-8, but we treat each byte
+			expected: 0, // The implementation iterates over bytes, so multi-byte characters are processed byte-by-byte.
 		},
 		{
 			name:     "Non-ASCII characters (本)",
