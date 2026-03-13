@@ -66,9 +66,9 @@ func TestDecode(t *testing.T) {
 			expected: 131621703842267136, // 36^11 from pow36Index[11]
 		},
 		{
-			name:     "Length 13 (1 followed by 12 zeros)",
+			name:     "Length 13 truncated to 12 (1 followed by 12 zeros)",
 			input:    "1000000000000",
-			expected: 4738381338321616896, // 36^12 from pow36Index[12]
+			expected: 131621703842267136, // effectively "100000000000" -> 36^11
 		},
 		{
 			name:     "Length 14 truncated to 12 (1 followed by 13 zeros)",
@@ -91,17 +91,17 @@ func TestDecode(t *testing.T) {
 			expected: 1, // '!' -> 0*36, '1' -> 1
 		},
 		{
-			name:     "Invalid Base64 characters (+)",
+			name:     "Invalid characters (+)",
 			input:    "+",
 			expected: 0,
 		},
 		{
-			name:     "Invalid Base64 characters (/)",
+			name:     "Invalid characters (/)",
 			input:    "/",
 			expected: 0,
 		},
 		{
-			name:     "Invalid Base64 characters (=)",
+			name:     "Invalid characters (=)",
 			input:    "=",
 			expected: 0,
 		},
@@ -136,14 +136,14 @@ func TestDecode(t *testing.T) {
 			expected: 0,
 		},
 		{
-			name:     "Length 14 truncated to 12 (exact)",
+			name:     "Length 15 truncated to 12",
 			input:    "1234567890AB CD", // length 15
-			expected: Decode("1234567890AB"),
+			expected: 139250390350663091, // "1234567890AB" in base36
 		},
 		{
-			name:     "Verify length 13 is NOT truncated",
-			input:    "1000000000000",
-			expected: 4738381338321616896,
+			name:     "Length 13 truncated to 12 (potential overflow)",
+			input:    "5000000000000",
+			expected: 658108519211335680, // "500000000000" in base36
 		},
 	}
 
