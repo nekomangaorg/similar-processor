@@ -56,9 +56,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 
 			mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
-			for _, apiManga := range mangaList.Data {
-				UpsertManga(apiManga)
-			}
+			BatchUpsertManga(mangaList.Data)
 		}
 		fmt.Println()
 
@@ -71,9 +69,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 		opts.Limit = optional.NewInt32(1)
 		opts.Ids = optional.NewInterface([]string{updateId})
 		mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
-		for _, apiManga := range mangaList.Data {
-			UpsertManga(apiManga)
-		}
+		BatchUpsertManga(mangaList.Data)
 
 	} else {
 		rateLimiter := ratelimit.New(1, ratelimit.Per(2*time.Second))
@@ -108,9 +104,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 			mangaList := SearchMangaDex(rateLimiter, client, ctx, opts)
 
 			if len(mangaList.Data) != 0 {
-				for _, apiManga := range mangaList.Data {
-					UpsertManga(apiManga)
-				}
+				BatchUpsertManga(mangaList.Data)
 			} else {
 				done = true
 			}

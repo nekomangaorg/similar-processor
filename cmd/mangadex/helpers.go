@@ -159,6 +159,30 @@ func UpsertManga(apiManga mangadex.Manga) {
 	internal.CheckErr(err)
 }
 
+func BatchUpsertManga(mangas []mangadex.Manga) {
+	if len(mangas) == 0 {
+		return
+	}
+
+	tx, err := internal.DB.Begin()
+	internal.CheckErr(err)
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("INSERT INTO " + internal.TableManga + " (UUID, JSON, DATE) VALUES (?, ?, ?) ON CONFLICT (UUID) DO UPDATE SET JSON=excluded.JSON")
+	internal.CheckErr(err)
+	defer stmt.Close()
+
+	currentDate := strings.Split(time.Now().UTC().Format(time.RFC3339), "Z")[0]
+	for _, apiManga := range mangas {
+		jsonManga := ApiMangaToJson(apiManga)
+		_, err = stmt.Exec(apiManga.Id, jsonManga, currentDate)
+		internal.CheckErr(err)
+	}
+
+	err = tx.Commit()
+	internal.CheckErr(err)
+}
+
 func getDBManga() []internal.DbManga {
 	rows, err := internal.DB.Query("SELECT UUID, JSON, DATE FROM " + internal.TableManga + " ORDER BY DATE ASC")
 	internal.CheckErr(err)
