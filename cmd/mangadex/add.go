@@ -51,16 +51,18 @@ func runAdd(cmd *cobra.Command, args []string) {
 
 		existingUUIDs := GetExistingMangaUUIDs(uuids)
 
+		var toUpsert []mangadex.Manga
 		for _, apiManga := range mangaList.Data {
 			if !existingUUIDs[apiManga.Id] {
 				count++
-				UpsertManga(apiManga)
+				toUpsert = append(toUpsert, apiManga)
 				fmt.Printf("Inserting manga with ID: %s\n", apiManga.Id)
 			} else {
 				done = true
 				break
 			}
 		}
+		BatchUpsertManga(toUpsert)
 	}
 	fmt.Printf("Inserted %d manga\n", count)
 

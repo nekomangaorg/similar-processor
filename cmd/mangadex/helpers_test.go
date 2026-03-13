@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/similar-manga/similar/internal"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/similar-manga/similar/internal"
 )
 
 var testUUIDs []string
