@@ -90,7 +90,7 @@ var (
 
 // Decode decodes a base36-encoded string.
 func Decode(s string) uint64 {
-	if len(s) > 13 {
+	if len(s) > 12 {
 		s = s[:12]
 	}
 	res := uint64(0)
