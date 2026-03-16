@@ -7,7 +7,6 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"go.uber.org/ratelimit"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"

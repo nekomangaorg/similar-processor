@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"container/heap"
 	"fmt"
+	"iter"
 	"log"
 	"math"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +19,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	similar "github.com/similar-manga/similar/cmd/calculate/similar_helpers"
 	"github.com/similar-manga/similar/internal"
-	"iter"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
 )
@@ -264,6 +265,7 @@ func calculateNorms(mangaCount int, lsiTagCSCWeighted, lsiDescCSC *sparse.CSC) (
 			fmt.Printf("Warning: Type assertion failed for tag vector %d\n", i)
 			continue
 		}
+		sortSparseVector(tv)
 		tagVectors[i] = tv
 
 		dv, ok := lsiDescCSC.ColView(i).(*sparse.Vector)
@@ -271,6 +273,7 @@ func calculateNorms(mangaCount int, lsiTagCSCWeighted, lsiDescCSC *sparse.CSC) (
 			fmt.Printf("Warning: Type assertion failed for desc vector %d\n", i)
 			continue
 		}
+		sortSparseVector(dv)
 		descVectors[i] = dv
 
 		tagNorms[i] = mat.Norm(tagVectors[i], 2)
@@ -591,8 +594,30 @@ func countWords(s string) int {
 	return count
 }
 
+type sparseSorter struct {
+	i []int
+	d []float64
+}
+
+func (s sparseSorter) Len() int           { return len(s.i) }
+func (s sparseSorter) Less(a, b int) bool { return s.i[a] < s.i[b] }
+func (s sparseSorter) Swap(a, b int) {
+	s.i[a], s.i[b] = s.i[b], s.i[a]
+	s.d[a], s.d[b] = s.d[b], s.d[a]
+}
+
+func sortSparseVector(v *sparse.Vector) {
+	if v == nil {
+		return
+	}
+	d, i := v.RawVector()
+	if !sort.IntsAreSorted(i) {
+		sort.Sort(sparseSorter{i: i, d: d})
+	}
+}
+
 // dotProductSparse calculates the dot product of two sparse vectors.
-// It assumes the underlying indices are sorted (which is standard for sparse.Vector).
+// It assumes the underlying indices are sorted (we ensure this with sortSparseVector).
 // Accessing RawVector() avoids interface overhead and allows O(NNZ) intersection.
 func dotProductSparse(v1, v2 *sparse.Vector) float64 {
 	if v1 == nil || v2 == nil {
