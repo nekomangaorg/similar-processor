@@ -1,0 +1,13 @@
+--- cmd/calculate/similar.go
++++ cmd/calculate/similar.go
+@@ -609,7 +609,9 @@
+		return
+	}
+	d, i := v.RawVector()
+-	sort.Sort(sparseSorter{i: i, d: d})
++	if !sort.IntsAreSorted(i) {
++		sort.Sort(sparseSorter{i: i, d: d})
++	}
+ }
+
+ // dotProductSparse calculates the dot product of two sparse vectors.

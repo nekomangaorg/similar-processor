@@ -611,9 +611,7 @@ func sortSparseVector(v *sparse.Vector) {
 		return
 	}
 	d, i := v.RawVector()
-	if !sort.IntsAreSorted(i) {
-		sort.Sort(sparseSorter{i: i, d: d})
-	}
+	sort.Sort(sparseSorter{i: i, d: d})
 }
 
 // dotProductSparse calculates the dot product of two sparse vectors.
