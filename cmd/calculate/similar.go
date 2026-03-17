@@ -225,29 +225,33 @@ func buildWeightedTagVectors(corpusTag []string) (*sparse.CSC, error) {
 	}
 
 	lsiTagCSCWeighted := lsiTag.(sparse.TypeConverter).ToCSC()
-	dimR, dimC := lsiTagCSCWeighted.Dims()
+	_, dimC := lsiTagCSCWeighted.Dims()
 
-	// CSC column indices must be sorted before calling Set()
-	// Otherwise, the binary search used by Set() will overwrite incorrect elements
+	// Iterate over each column, sort it, and apply weights efficiently.
 	for c := 0; c < dimC; c++ {
 		tv, ok := lsiTagCSCWeighted.ColView(c).(*sparse.Vector)
-		if ok {
-			sortSparseVector(tv)
+		if !ok {
+			// This should not happen with the current library, but good to be safe.
+			log.Printf("Warning: column %d is not a *sparse.Vector, skipping processing", c)
+			continue
 		}
-	}
+		sortSparseVector(tv)
 
-	for r := 0; r < dimR; r++ {
-		tag := vocabularyInverse[r]
-		weight := DefaultTagWeight
-		if val, ok := tagWeights[tag]; ok {
-			weight = val
-		}
-		for c := 0; c < dimC; c++ {
-			if lsiTagCSCWeighted.At(r, c) > 0 {
-				lsiTagCSCWeighted.Set(r, c, weight)
+		// Directly update the data in the sparse vector for this column.
+		// This is much more efficient than the subsequent row-major loop.
+		data, indices := tv.RawVector()
+		for i, r := range indices {
+			if data[i] > 0 { // Only update existing non-zero elements
+				tag := vocabularyInverse[r]
+				weight := DefaultTagWeight
+				if val, ok := tagWeights[tag]; ok {
+					weight = val
+				}
+				data[i] = weight
 			}
 		}
 	}
+
 	return lsiTagCSCWeighted, nil
 }
 
