@@ -226,6 +226,16 @@ func buildWeightedTagVectors(corpusTag []string) (*sparse.CSC, error) {
 
 	lsiTagCSCWeighted := lsiTag.(sparse.TypeConverter).ToCSC()
 	dimR, dimC := lsiTagCSCWeighted.Dims()
+
+	// CSC column indices must be sorted before calling Set()
+	// Otherwise, the binary search used by Set() will overwrite incorrect elements
+	for c := 0; c < dimC; c++ {
+		tv, ok := lsiTagCSCWeighted.ColView(c).(*sparse.Vector)
+		if ok {
+			sortSparseVector(tv)
+		}
+	}
+
 	for r := 0; r < dimR; r++ {
 		tag := vocabularyInverse[r]
 		weight := DefaultTagWeight
