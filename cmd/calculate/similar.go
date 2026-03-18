@@ -475,10 +475,15 @@ func processManga(idx int, data *SimilarityData, config processingConfig, progre
 	for i := len(simData.SimilarMatches) - 1; i >= 0; i-- {
 		m := heap.Pop(h).(customMatch)
 		target := data.MangaList[m.ID]
-		simData.SimilarMatches[i] = internal.SimilarMatch{
-			Id: target.Id, Title: *target.Title, Score: float32(m.Distance / (TagScoreRatio + 1.0)),
+		match := internal.SimilarMatch{
+			Id:        target.Id,
+			Score:     float32(m.Distance / (TagScoreRatio + 1.0)),
 			Languages: target.AvailableTranslatedLanguages,
 		}
+		if target.Title != nil {
+			match.Title = *target.Title
+		}
+		simData.SimilarMatches[i] = match
 	}
 
 	if !config.debugMode {
