@@ -471,13 +471,14 @@ func processManga(idx int, data *SimilarityData, config processingConfig, progre
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	for h.Len() > 0 {
+	simData.SimilarMatches = make([]internal.SimilarMatch, h.Len())
+	for i := len(simData.SimilarMatches) - 1; i >= 0; i-- {
 		m := heap.Pop(h).(customMatch)
 		target := data.MangaList[m.ID]
-		simData.SimilarMatches = append(simData.SimilarMatches, internal.SimilarMatch{
+		simData.SimilarMatches[i] = internal.SimilarMatch{
 			Id: target.Id, Title: *target.Title, Score: float32(m.Distance / (TagScoreRatio + 1.0)),
 			Languages: target.AvailableTranslatedLanguages,
-		})
+		}
 	}
 
 	if !config.debugMode {
