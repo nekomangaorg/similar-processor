@@ -247,7 +247,7 @@ func buildWeightedTagVectors(corpusTag []string) (*sparse.CSC, error) {
 				if val, ok := tagWeights[tag]; ok {
 					weight = val
 				}
-				data[i] = weight
+				data[i] *= weight
 			}
 		}
 	}
