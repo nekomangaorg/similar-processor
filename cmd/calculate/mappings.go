@@ -3,6 +3,7 @@ package calculate
 import (
 	"fmt"
 	"github.com/similar-manga/similar/internal"
+	"iter"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"
 	"sync"
@@ -23,7 +24,7 @@ func init() {
 func runMappings(cmd *cobra.Command, args []string) {
 	initialStart := time.Now()
 
-	mangaList := internal.GetAllManga()
+	mangaStream := internal.StreamAllManga()
 
 	type mappingInfo struct {
 		name      string
@@ -47,7 +48,7 @@ func runMappings(cmd *cobra.Command, args []string) {
 	internal.CheckErr(err)
 	defer tx.Rollback()
 
-	for _, manga := range mangaList {
+	for manga := range mangaStream {
 		for _, m := range mappings {
 			id := manga.Links[m.linkKey]
 			if id != "" {
@@ -65,13 +66,14 @@ func runMappings(cmd *cobra.Command, args []string) {
 		exportMapping(m.tableName, m.fileName)
 	}
 
-	calculateMangaUpdatesNewIdMapping(mangaList)
+	totalManga := internal.GetMangaCount()
+	calculateMangaUpdatesNewIdMapping(mangaStream, totalManga)
 
 	fmt.Printf("Finished all mappings in %s\n", time.Since(initialStart))
 
 }
 
-func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
+func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], totalManga int) {
 	fmt.Println("Calculating MangaUpdates New Id Mapping")
 	rateLimiter := ratelimit.New(1)
 
@@ -83,18 +85,18 @@ func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
 
 	// Loop through all manga and try to get their chapter information for each
 	start := time.Now()
-	totalManga := len(mangaList)
 	var wg sync.WaitGroup
-	wg.Add(totalManga)
 	maxGoroutines := 1000
 	guard := make(chan struct{}, maxGoroutines)
 
-	for index, manga := range mangaList {
+	index := 0
+	for manga := range mangaList {
 		muLink := manga.Links["mu"]
 
 		// would block if guard channel is already filled
 		guard <- struct{}{}
 
+		wg.Add(1)
 		go func(index int, totalManga int, uuid string, muLink string, limiter ratelimit.Limiter) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -110,6 +112,7 @@ func calculateMangaUpdatesNewIdMapping(mangaList []internal.Manga) {
 			}
 			<-guard
 		}(index, totalManga, manga.Id, muLink, rateLimiter)
+		index++
 	}
 
 	wg.Wait()

@@ -89,3 +89,11 @@ func GetAllManga() []Manga {
 	}
 	return mangaList
 }
+
+// GetMangaCount returns the total number of manga in the database.
+func GetMangaCount() int {
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM " + TableManga).Scan(&count)
+	CheckErr(err)
+	return count
+}
