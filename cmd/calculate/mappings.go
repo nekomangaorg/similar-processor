@@ -66,8 +66,9 @@ func runMappings(cmd *cobra.Command, args []string) {
 		exportMapping(m.tableName, m.fileName)
 	}
 
-	totalManga := internal.GetMangaCount()
-calculateMangaUpdatesNewIdMapping(internal.StreamAllManga(), totalManga)
+	totalManga, err := internal.GetMangaCount()
+	internal.CheckErr(err)
+	calculateMangaUpdatesNewIdMapping(internal.StreamAllManga(), totalManga)
 
 	fmt.Printf("Finished all mappings in %s\n", time.Since(initialStart))
 
