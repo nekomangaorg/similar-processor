@@ -23,7 +23,7 @@ func BenchmarkInsertSimilarData(b *testing.B) {
 	internal.DB = db
 	defer func() {
 		internal.DB = originalDB
-		ResetSimilarInsertStmt()
+		resetSimilarInsertStmt()
 	}()
 
 	_, err = db.Exec("CREATE TABLE " + internal.TableSimilar + " (UUID TEXT PRIMARY KEY, JSON BLOB)")
@@ -33,14 +33,15 @@ func BenchmarkInsertSimilarData(b *testing.B) {
 
 	b.ResetTimer()
 
+	now := time.Now().UTC().Format(time.RFC3339)
 	var counter uint64
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			id := atomic.AddUint64(&counter, 1)
 			InsertSimilarData(internal.SimilarManga{
-				Id: fmt.Sprintf("uuid-%d", id),
-				Title: map[string]string{"en":"Test"},
-				UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+				Id:        fmt.Sprintf("uuid-%d", id),
+				Title:     map[string]string{"en": "Test"},
+				UpdatedAt: now,
 			})
 		}
 	})

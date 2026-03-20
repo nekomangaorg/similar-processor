@@ -1,7 +1,6 @@
 package calculate
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"github.com/similar-manga/similar/internal"
@@ -21,17 +20,17 @@ var (
 	similarInsertOnce sync.Once
 )
 
-// InitSimilarInsertStmt initializes the prepared statement for InsertSimilarData.
+// initSimilarInsertStmt initializes the prepared statement for InsertSimilarData.
 // It is exposed for testing purposes to allow resetting the global state.
-func InitSimilarInsertStmt() {
+func initSimilarInsertStmt() {
 	var err error
 	similarInsertStmt, err = internal.DB.Prepare("INSERT INTO " + internal.TableSimilar + " (UUID, JSON) VALUES (?, ?)")
 	internal.CheckErr(err)
 }
 
-// ResetSimilarInsertStmt closes the prepared statement and resets the once flag.
+// resetSimilarInsertStmt closes the prepared statement and resets the once flag.
 // This is strictly used for testing and benching.
-func ResetSimilarInsertStmt() {
+func resetSimilarInsertStmt() {
 	similarInsertOnce = sync.Once{}
 	if similarInsertStmt != nil {
 		similarInsertStmt.Close()
@@ -40,14 +39,12 @@ func ResetSimilarInsertStmt() {
 }
 
 func InsertSimilarData(similarData internal.SimilarManga) {
-	similarInsertOnce.Do(InitSimilarInsertStmt)
+	similarInsertOnce.Do(initSimilarInsertStmt)
 
-	dst := &bytes.Buffer{}
-	jsonSimilar, _ := json.Marshal(similarData)
-	err := json.Compact(dst, jsonSimilar)
+	jsonSimilar, err := json.Marshal(similarData)
 	internal.CheckErr(err)
 
-	_, err = similarInsertStmt.Exec(similarData.Id, dst.Bytes())
+	_, err = similarInsertStmt.Exec(similarData.Id, jsonSimilar)
 	internal.CheckErr(err)
 }
 
