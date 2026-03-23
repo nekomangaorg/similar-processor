@@ -3,9 +3,9 @@ package calculate
 import (
 	"fmt"
 	"github.com/similar-manga/similar/internal"
-	"iter"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"
+	"iter"
 	"sync"
 	"time"
 )

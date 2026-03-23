@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/similar-manga/similar/internal"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/similar-manga/similar/internal"
 )
 
 func TestProcessMangaList(t *testing.T) {
@@ -43,7 +43,7 @@ func TestProcessMangaList(t *testing.T) {
 	}
 
 	// Verify
-	rows, err := outputDB.Query("SELECT mdex, al FROM "+internal.TableNekoMappings+" WHERE mdex = 'uuid-1'")
+	rows, err := outputDB.Query("SELECT mdex, al FROM " + internal.TableNekoMappings + " WHERE mdex = 'uuid-1'")
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/similar-manga/similar/internal"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/similar-manga/similar/internal"
 )
 
 func BenchmarkNekoExport(b *testing.B) {
