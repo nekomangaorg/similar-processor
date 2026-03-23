@@ -149,5 +149,8 @@ func createNekoMappingDB() *sql.DB {
 
 func insertNekoEntry(stmt *sql.Stmt, nekoEntry internal.DbNeko) {
 	_, err := stmt.Exec(nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
-	internal.CheckErr(err)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to insert neko entry for manga %s: %v\n", nekoEntry.UUID, err)
+		fmt.Fprintln(os.Stderr, "Continuing after error.")
+	}
 }
