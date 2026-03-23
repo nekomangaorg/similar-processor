@@ -189,17 +189,25 @@ func filterAndBuildCorpus(allManga iter.Seq[internal.Manga]) *CorpusData {
 		tagText := tagTextBuilder.String()
 
 		descTextBuilder.Reset()
-		descTextBuilder.WriteString(similar.CleanTitle((*manga.Title)["en"]))
-		descTextBuilder.WriteByte(' ')
+		if cleaned := similar.CleanTitle((*manga.Title)["en"]); cleaned != "" {
+			descTextBuilder.WriteString(cleaned)
+		}
 		for _, altTitle := range manga.AltTitles {
 			if val, ok := altTitle["en"]; ok {
 				if cleaned := similar.CleanTitle(val); cleaned != "" {
+					if descTextBuilder.Len() > 0 {
+						descTextBuilder.WriteByte(' ')
+					}
 					descTextBuilder.WriteString(cleaned)
-					descTextBuilder.WriteByte(' ')
 				}
 			}
 		}
-		descTextBuilder.WriteString(similar.CleanDescription((*manga.Description)["en"]))
+		if cleaned := similar.CleanDescription((*manga.Description)["en"]); cleaned != "" {
+			if descTextBuilder.Len() > 0 {
+				descTextBuilder.WriteByte(' ')
+			}
+			descTextBuilder.WriteString(cleaned)
+		}
 		descText := descTextBuilder.String()
 
 		corpusTag = append(corpusTag, tagText)
