@@ -71,7 +71,7 @@ func setupDB(b *testing.B) *sql.DB {
 
 	for i := 0; i < 1000; i++ {
 		manga := Manga{
-			Id: fmt.Sprintf("uuid-%d", i),
+			Id:    fmt.Sprintf("uuid-%d", i),
 			Title: &map[string]string{"en": fmt.Sprintf("Title %d", i)},
 		}
 		jsonData, _ := json.Marshal(manga)

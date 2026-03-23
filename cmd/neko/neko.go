@@ -3,11 +3,11 @@ package neko
 import (
 	"database/sql"
 	"fmt"
-	"iter"
 	"github.com/similar-manga/similar/cmd"
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
 	"io"
+	"iter"
 	"os"
 	"time"
 )

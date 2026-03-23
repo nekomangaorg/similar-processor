@@ -33,7 +33,7 @@ func hasPromoTag(s string) bool {
 			// Case-insensitive check for the content.
 			isMatch := true
 			for j := 1; j < tagLen-1; j++ {
-				if (s[i+j]|0x20) != tag[j] {
+				if (s[i+j] | 0x20) != tag[j] {
 					isMatch = false
 					break
 				}

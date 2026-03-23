@@ -137,7 +137,7 @@ func TestDecode(t *testing.T) {
 		},
 		{
 			name:     "Length 15 truncated to 12",
-			input:    "1234567890AB CD", // length 15
+			input:    "1234567890AB CD",  // length 15
 			expected: 139250390350663091, // "1234567890AB" in base36
 		},
 		{
