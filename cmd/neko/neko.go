@@ -56,6 +56,10 @@ func runNeko(command *cobra.Command, args []string) {
 }
 
 func processMangaList(tx *sql.Tx, mangaList iter.Seq[internal.Manga], mappings map[string]map[string]string) {
+	stmt, err := tx.Prepare("INSERT INTO " + internal.TableNekoMappings + " (mdex, al, ap, bw, mu, mu_new, nu, kt , mal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	internal.CheckErr(err)
+	defer stmt.Close()
+
 	for manga := range mangaList {
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
@@ -66,7 +70,7 @@ func processMangaList(tx *sql.Tx, mangaList iter.Seq[internal.Manga], mappings m
 			}
 		}
 
-		insertNekoEntry(tx, nekoEntry)
+		insertNekoEntry(stmt, nekoEntry)
 	}
 }
 
@@ -143,7 +147,10 @@ func createNekoMappingDB() *sql.DB {
 	return internal.ConnectNekoDB(dbName)
 }
 
-func insertNekoEntry(tx *sql.Tx, nekoEntry internal.DbNeko) {
-	_, err := tx.Exec("INSERT INTO "+internal.TableNekoMappings+" (mdex, al, ap, bw, mu, mu_new, nu, kt , mal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
-	internal.CheckErr(err)
+func insertNekoEntry(stmt *sql.Stmt, nekoEntry internal.DbNeko) {
+	_, err := stmt.Exec(nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to insert neko entry for manga %s: %v\n", nekoEntry.UUID, err)
+		fmt.Fprintln(os.Stderr, "Continuing after error.")
+	}
 }
