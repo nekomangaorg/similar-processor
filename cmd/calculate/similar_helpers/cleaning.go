@@ -48,29 +48,28 @@ var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), 
 func fastCleanTitle(strRaw string) string {
 	var b strings.Builder
 	b.Grow(len(strRaw))
+	var lastChar byte
 	for i := 0; i < len(strRaw); i++ {
 		char := strRaw[i]
 		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
 			b.WriteByte(char)
+			lastChar = char
 		} else if char == ' ' {
-			if b.Len() > 0 && b.String()[b.Len()-1] != ' ' {
+			if b.Len() == 0 || lastChar != ' ' {
 				b.WriteByte(' ')
-			} else if b.Len() == 0 {
-				b.WriteByte(' ')
+				lastChar = ' '
 			}
 		}
 	}
 
-	res := b.String()
 	// preserve original trailing space behavior
-	if strings.HasSuffix(strRaw, " ") && !strings.HasSuffix(res, " ") {
-		res += " "
+	if strings.HasSuffix(strRaw, " ") && (b.Len() == 0 || lastChar != ' ') {
+		b.WriteByte(' ')
 	}
-	return res
+	return b.String()
 }
 
 func CleanTitle(strRaw string) string {
-    // Note: Do NOT use transform.String here, original code did not!
 	strRaw = fastCleanTitle(strRaw)
 
 	if strRaw == "" || strRaw == " " {
@@ -91,29 +90,28 @@ func CleanTitle(strRaw string) string {
 func fastCleanDescription(strRaw string) string {
 	var b strings.Builder
 	b.Grow(len(strRaw))
+	var lastChar byte
 	for i := 0; i < len(strRaw); i++ {
 		char := strRaw[i]
 		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
 			b.WriteByte(char)
+			lastChar = char
 		} else if char == ' ' || char == '\t' || char == '\n' || char == '\r' {
-			if b.Len() > 0 && b.String()[b.Len()-1] != ' ' {
+			if b.Len() == 0 || lastChar != ' ' {
 				b.WriteByte(' ')
-			} else if b.Len() == 0 {
-				b.WriteByte(' ')
+				lastChar = ' '
 			}
 		} else {
-		    // Other unicode characters are ignored just like regexp [^a-zA-Z0-9 ]+ -> "" ignores them
+			// Other unicode characters are ignored just like regexp [^a-zA-Z0-9 ]+ -> "" ignores them
 		}
 	}
 
-	res := b.String()
 	// preserve original trailing space behavior
-	if strings.HasSuffix(strRaw, " ") && !strings.HasSuffix(res, " ") {
-		res += " "
+	if strings.HasSuffix(strRaw, " ") && (b.Len() == 0 || lastChar != ' ') {
+		b.WriteByte(' ')
 	}
-	return res
+	return b.String()
 }
-
 
 func CleanDescription(strRaw string) string {
 	// Remove all non-english descriptions
