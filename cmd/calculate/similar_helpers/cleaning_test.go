@@ -101,3 +101,11 @@ func TestCleanTitle(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanDescription(t *testing.T) {
+	input := "This is a typical description for a manga. It has several sentences. (source: mangadex) [b]bold text[/b] http://example.com"
+	expected := "thi is a typic descript for a manga it ha sever sentenc bold text httpexamplecom"
+	if got := CleanDescription(input); got != expected {
+		t.Errorf("CleanDescription() = %q, want %q", got, expected)
+	}
+}
