@@ -114,7 +114,12 @@ func filterTextTags(strRaw string) string {
 		idx := strings.IndexByte(strRaw, '\n')
 		if idx != -1 {
 			b = append(b, ' ')
-			i = idx + 1
+			// Consume all subsequent \r and \n characters to match [\r\n]*
+			idx++
+			for idx < len(strRaw) && (strRaw[idx] == '\n' || strRaw[idx] == '\r') {
+				idx++
+			}
+			i = idx
 		} else {
 			b = append(b, ' ')
 			return string(b)
@@ -140,12 +145,9 @@ func filterTextTags(strRaw string) string {
 			if strings.HasPrefix(strRaw[i:], "(source: ") || strings.HasPrefix(strRaw[i:], "(from: ") {
 				end := strings.IndexByte(strRaw[i+1:], ')')
 				if end != -1 {
-					newlineIdx := strings.IndexByte(strRaw[i+1:i+1+end], '\n')
-					if newlineIdx == -1 {
-						b = append(b, ' ')
-						i = i + 1 + end + 1
-						continue
-					}
+					b = append(b, ' ')
+					i = i + 1 + end + 1
+					continue
 				}
 			}
 		}
@@ -154,12 +156,9 @@ func filterTextTags(strRaw string) string {
 		if strRaw[i] == '<' {
 			end := strings.IndexByte(strRaw[i+1:], '>')
 			if end != -1 {
-				newlineIdx := strings.IndexByte(strRaw[i+1:i+1+end], '\n')
-				if newlineIdx == -1 {
-					b = append(b, ' ')
-					i = i + 1 + end + 1
-					continue
-				}
+				b = append(b, ' ')
+				i = i + 1 + end + 1
+				continue
 			}
 		}
 
