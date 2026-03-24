@@ -5,19 +5,8 @@ import (
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
-	"regexp"
 	"strings"
 	"unicode"
-)
-
-var (
-	reg02 = regexp.MustCompile(`\[.*?]`)
-	reg03 = regexp.MustCompile(`\(source: [^)]*\)`)
-	reg04 = regexp.MustCompile(`\(from: [^)]*\)`)
-	reg05 = regexp.MustCompile(`<[^>]*>`)
-	reg06 = regexp.MustCompile(`^https?:\/\/.*[\r\n]*`)
-	reg07 = regexp.MustCompile(`^http?:\/\/.*[\r\n]*`)
-	reg08 = regexp.MustCompile(`[\w\.-]+@[\w\.-]+`)
 )
 
 var apostropheReplacer = strings.NewReplacer(
@@ -113,6 +102,106 @@ func fastCleanDescription(strRaw string) string {
 	return b.String()
 }
 
+func isEmailChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'
+}
+
+func filterTextTags(strRaw string) string {
+	b := make([]byte, 0, len(strRaw))
+	i := 0
+
+	if strings.HasPrefix(strRaw, "http://") || strings.HasPrefix(strRaw, "https://") {
+		idx := strings.IndexByte(strRaw, '\n')
+		if idx != -1 {
+			b = append(b, ' ')
+			// Consume all subsequent \r and \n characters to match [\r\n]*
+			idx++
+			for idx < len(strRaw) && (strRaw[idx] == '\n' || strRaw[idx] == '\r') {
+				idx++
+			}
+			i = idx
+		} else {
+			b = append(b, ' ')
+			return string(b)
+		}
+	}
+
+	for i < len(strRaw) {
+		// [.*?]
+		if strRaw[i] == '[' {
+			end := strings.IndexByte(strRaw[i+1:], ']')
+			if end != -1 {
+				// regex `.` does not match `\n` without `(?s)` flag
+				newlineIdx := strings.IndexByte(strRaw[i+1:i+1+end], '\n')
+				if newlineIdx == -1 {
+					i = i + 1 + end + 1
+					continue
+				}
+			}
+		}
+
+		// (source: ... ) or (from: ... )
+		if strRaw[i] == '(' {
+			if strings.HasPrefix(strRaw[i:], "(source: ") || strings.HasPrefix(strRaw[i:], "(from: ") {
+				end := strings.IndexByte(strRaw[i+1:], ')')
+				if end != -1 {
+					b = append(b, ' ')
+					i = i + 1 + end + 1
+					continue
+				}
+			}
+		}
+
+		// <[^>]*>
+		if strRaw[i] == '<' {
+			end := strings.IndexByte(strRaw[i+1:], '>')
+			if end != -1 {
+				b = append(b, ' ')
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+
+		// Email [\w\.-]+@[\w\.-]+
+		if strRaw[i] == '@' {
+			start := len(b) - 1
+			validEmail := false
+			for start >= 0 {
+				if isEmailChar(b[start]) {
+					start--
+					validEmail = true
+				} else {
+					break
+				}
+			}
+			start++ // first valid char
+
+			end := i + 1
+			validEnd := false
+			for end < len(strRaw) {
+				if isEmailChar(strRaw[end]) {
+					end++
+					validEnd = true
+				} else {
+					break
+				}
+			}
+
+			if validEmail && validEnd {
+				b = b[:start]
+				b = append(b, ' ')
+				i = end
+				continue
+			}
+		}
+
+		b = append(b, strRaw[i])
+		i++
+	}
+
+	return string(b)
+}
+
 func CleanDescription(strRaw string) string {
 	// Remove all non-english descriptions
 	for _, tag := range DescriptionLanguages {
@@ -140,15 +229,7 @@ func CleanDescription(strRaw string) string {
 		strRaw = strings.ReplaceAll(strRaw, tag, "")
 	}
 
-	strRaw = reg02.ReplaceAllString(strRaw, "")
-	strRaw = reg03.ReplaceAllString(strRaw, " ")
-	strRaw = reg04.ReplaceAllString(strRaw, " ")
-	strRaw = reg05.ReplaceAllString(strRaw, " ")
-
-	// Remove emails and urls
-	strRaw = reg06.ReplaceAllString(strRaw, " ")
-	strRaw = reg07.ReplaceAllString(strRaw, " ")
-	strRaw = reg08.ReplaceAllString(strRaw, " ")
+	strRaw = filterTextTags(strRaw)
 
 	// Remove all symbols (clean to normal english) and collapse spaces
 	strRaw = fastCleanDescription(strRaw)

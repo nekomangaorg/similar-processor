@@ -101,3 +101,51 @@ func TestCleanTitle(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanDescription(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Basic Description",
+			input:    "This is a typical description for a manga. It has several sentences. (source: mangadex) [b]bold text[/b] http://example.com",
+			expected: "thi is a typic descript for a manga it ha sever sentenc bold text httpexamplecom",
+		},
+		{
+			name:     "Nested Brackets",
+			input:    "Nested [a [b] c] text",
+			expected: "nes text",
+		},
+		{
+			name:     "HTTP Without Newline",
+			input:    "http://example.com",
+			expected: " ",
+		},
+		{
+			name:     "HTTPS With Newline",
+			input:    "https://example.com\nhello world",
+			expected: " ",
+		},
+		{
+			name:     "Email Removal",
+			input:    "Contact us at admin@example.com for more info",
+			expected: "contact us at for more info",
+		},
+		{
+			name:     "HTML Tags",
+			input:    "Hello <b>bold</b> and <i>italic</i>",
+			expected: "hello bold and ital ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CleanDescription(tt.input)
+			if got != tt.expected {
+				t.Errorf("CleanDescription(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
