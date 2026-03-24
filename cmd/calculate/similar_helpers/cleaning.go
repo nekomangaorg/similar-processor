@@ -10,59 +10,126 @@ import (
 	"unicode"
 )
 
-var reg00, _ = regexp.Compile(`\n?\r`)
-var reg01, _ = regexp.Compile(`\n`)
-var reg02, _ = regexp.Compile(`\[.*?]`)
-var reg03, _ = regexp.Compile(`\(source: [^)]*\)`)
-var reg04, _ = regexp.Compile(`\(from: [^)]*\)`)
-var reg05, _ = regexp.Compile(`<[^>]*>`)
-var reg06, _ = regexp.Compile(`^https?:\/\/.*[\r\n]*`)
-var reg07, _ = regexp.Compile(`^http?:\/\/.*[\r\n]*`)
-var reg08, _ = regexp.Compile(`[\w\.-]+@[\w\.-]+`)
-var reg09, _ = regexp.Compile(`[^a-zA-Z0-9 ]+`)
-var reg10, _ = regexp.Compile(`\s+`)
+var (
+	reg02 = regexp.MustCompile(`\[.*?]`)
+	reg03 = regexp.MustCompile(`\(source: [^)]*\)`)
+	reg04 = regexp.MustCompile(`\(from: [^)]*\)`)
+	reg05 = regexp.MustCompile(`<[^>]*>`)
+	reg06 = regexp.MustCompile(`^https?:\/\/.*[\r\n]*`)
+	reg07 = regexp.MustCompile(`^http?:\/\/.*[\r\n]*`)
+	reg08 = regexp.MustCompile(`[\w\.-]+@[\w\.-]+`)
+)
+
+var apostropheReplacer = strings.NewReplacer(
+	"isn't", "is not",
+	"aren't", "are not",
+	"ain't", "am not",
+	"won't", "will not",
+	"didn't", "did not",
+	"shan't", "shall not",
+	"haven't", "have not",
+	"hadn't", "had not",
+	"hasn't", "has not",
+	"don't", "do not",
+	"wasn't", "was not",
+	"weren't", "were not",
+	"doesn't", "does not",
+	"'s", " is",
+	"'re", " are",
+	"'m", " am",
+	"'d", " would",
+	"'ll", " will",
+	"\r", " ",
+	"\n", " ",
+)
+
+var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+
+func fastCleanTitle(strRaw string) string {
+	var b strings.Builder
+	b.Grow(len(strRaw))
+	var lastChar byte
+	for i := 0; i < len(strRaw); i++ {
+		char := strRaw[i]
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
+			b.WriteByte(char)
+			lastChar = char
+		} else if char == ' ' {
+			if b.Len() == 0 || lastChar != ' ' {
+				b.WriteByte(' ')
+				lastChar = ' '
+			}
+		}
+	}
+
+	// preserve original trailing space behavior
+	if strings.HasSuffix(strRaw, " ") && (b.Len() == 0 || lastChar != ' ') {
+		b.WriteByte(' ')
+	}
+	return b.String()
+}
 
 func CleanTitle(strRaw string) string {
+	// Note: Do NOT use transform.String here, original code did not!
+	strRaw = fastCleanTitle(strRaw)
 
-	// Remove all symbols (clean to normal english)
-	strRaw = reg09.ReplaceAllString(strRaw, "")
-
-	// Remove multiple spaces
-	strRaw = reg10.ReplaceAllString(strRaw, " ")
+	if strRaw == "" || strRaw == " " {
+		return strRaw
+	}
 
 	// Stemming (porter)
 	strRawArray := strings.Split(strRaw, " ")
 	stemmer.StemMultipleMutate(&strRawArray)
 	strRaw = strings.Join(strRawArray, " ")
 
-	// To lowercase
+	// Stemmer makes upper, so we need to lowercase again
 	strRaw = strings.ToLower(strRaw)
 
-	// Finally return
 	return strRaw
+}
 
+func fastCleanDescription(strRaw string) string {
+	var b strings.Builder
+	b.Grow(len(strRaw))
+	var lastChar byte
+	for i := 0; i < len(strRaw); i++ {
+		char := strRaw[i]
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') {
+			b.WriteByte(char)
+			lastChar = char
+		} else if char == ' ' || char == '\t' || char == '\n' || char == '\r' {
+			if b.Len() == 0 || lastChar != ' ' {
+				b.WriteByte(' ')
+				lastChar = ' '
+			}
+		} else {
+			// Other unicode characters are ignored just like regexp [^a-zA-Z0-9 ]+ -> "" ignores them
+		}
+	}
+
+	// preserve original trailing space behavior
+	if strings.HasSuffix(strRaw, " ") && (b.Len() == 0 || lastChar != ' ') {
+		b.WriteByte(' ')
+	}
+	return b.String()
 }
 
 func CleanDescription(strRaw string) string {
-
 	// Remove all non-english descriptions
-	// This assumes the english one is first
-	// https://github.com/CarlosEsco/Neko/blob/master/app/src/main/java/eu/kanade/tachiyomi/source/online/utils/MdUtil.kt
 	for _, tag := range DescriptionLanguages {
-		strRaw = strings.Split(strRaw, tag)[0]
+		if idx := strings.Index(strRaw, tag); idx != -1 {
+			strRaw = strRaw[:idx]
+		}
 	}
 
 	// Remove "rune" / umlauts / diacritics
-	// https://stackoverflow.com/a/26722698/7718197
-	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-	strRaw, _, _ = transform.String(t, strRaw)
+	strRaw, _, _ = transform.String(transformer, strRaw)
 
 	// To lowercase
 	strRaw = strings.ToLower(strRaw)
 
-	// Replace new lines with space
-	strRaw = reg00.ReplaceAllString(strRaw, " ")
-	strRaw = reg01.ReplaceAllString(strRaw, " ")
+	// Replace new lines with space and standard lexicons
+	strRaw = apostropheReplacer.Replace(strRaw)
 
 	// Now remove all english tags which are no longer needed
 	for _, tag := range EnglishDescriptionTags {
@@ -73,14 +140,10 @@ func CleanDescription(strRaw string) string {
 	for _, tag := range BBCodes {
 		strRaw = strings.ReplaceAll(strRaw, tag, "")
 	}
-	strRaw = reg02.ReplaceAllString(strRaw, "")
 
-	// Remove source parentheses typical of anilist
-	// Eg: (source: solitarycross), (source: eat manga)
+	strRaw = reg02.ReplaceAllString(strRaw, "")
 	strRaw = reg03.ReplaceAllString(strRaw, " ")
 	strRaw = reg04.ReplaceAllString(strRaw, " ")
-
-	// Remove any html codes
 	strRaw = reg05.ReplaceAllString(strRaw, " ")
 
 	// Remove emails and urls
@@ -88,31 +151,12 @@ func CleanDescription(strRaw string) string {
 	strRaw = reg07.ReplaceAllString(strRaw, " ")
 	strRaw = reg08.ReplaceAllString(strRaw, " ")
 
-	// Replace apostrophes with standard lexicons
-	strRaw = strings.ReplaceAll(strRaw, "isn't", "is not")
-	strRaw = strings.ReplaceAll(strRaw, "aren't", "are not")
-	strRaw = strings.ReplaceAll(strRaw, "ain't", "am not")
-	strRaw = strings.ReplaceAll(strRaw, "won't", "will not")
-	strRaw = strings.ReplaceAll(strRaw, "didn't", "did not")
-	strRaw = strings.ReplaceAll(strRaw, "shan't", "shall not")
-	strRaw = strings.ReplaceAll(strRaw, "haven't", "have not")
-	strRaw = strings.ReplaceAll(strRaw, "hadn't", "had not")
-	strRaw = strings.ReplaceAll(strRaw, "hasn't", "has not")
-	strRaw = strings.ReplaceAll(strRaw, "don't", "do not")
-	strRaw = strings.ReplaceAll(strRaw, "wasn't", "was not")
-	strRaw = strings.ReplaceAll(strRaw, "weren't", "were not")
-	strRaw = strings.ReplaceAll(strRaw, "doesn't", "does not")
-	strRaw = strings.ReplaceAll(strRaw, "'s", " is")
-	strRaw = strings.ReplaceAll(strRaw, "'re", " are")
-	strRaw = strings.ReplaceAll(strRaw, "'m", " am")
-	strRaw = strings.ReplaceAll(strRaw, "'d", " would")
-	strRaw = strings.ReplaceAll(strRaw, "'ll", " will")
+	// Remove all symbols (clean to normal english) and collapse spaces
+	strRaw = fastCleanDescription(strRaw)
 
-	// Remove all symbols (clean to normal english)
-	strRaw = reg09.ReplaceAllString(strRaw, "")
-
-	// Remove multiple spaces
-	strRaw = reg10.ReplaceAllString(strRaw, " ")
+	if strRaw == "" || strRaw == " " {
+		return strRaw
+	}
 
 	// Stemming (porter)
 	strRawArray := strings.Split(strRaw, " ")
@@ -122,6 +166,5 @@ func CleanDescription(strRaw string) string {
 	// To lowercase (again since stemmer makes upper)
 	strRaw = strings.ToLower(strRaw)
 
-	// Finally return
 	return strRaw
 }
