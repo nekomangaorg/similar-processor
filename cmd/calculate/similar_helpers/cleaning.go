@@ -107,64 +107,59 @@ func isEmailChar(c byte) bool {
 }
 
 func filterTextTags(strRaw string) string {
+	b := make([]byte, 0, len(strRaw))
+	i := 0
+
 	if strings.HasPrefix(strRaw, "http://") || strings.HasPrefix(strRaw, "https://") {
 		idx := strings.IndexByte(strRaw, '\n')
 		if idx != -1 {
-			strRaw = " " + strRaw[idx+1:]
+			b = append(b, ' ')
+			i = idx + 1
 		} else {
-			strRaw = " "
+			b = append(b, ' ')
+			return string(b)
 		}
 	}
 
-	b := make([]byte, 0, len(strRaw))
-	i := 0
 	for i < len(strRaw) {
 		// [.*?]
 		if strRaw[i] == '[' {
-			end := -1
-			for j := i + 1; j < len(strRaw); j++ {
-				if strRaw[j] == ']' {
-					end = j
-					break
-				}
-			}
+			end := strings.IndexByte(strRaw[i+1:], ']')
 			if end != -1 {
-				i = end + 1
-				continue
+				// regex `.` does not match `\n` without `(?s)` flag
+				newlineIdx := strings.IndexByte(strRaw[i+1:i+1+end], '\n')
+				if newlineIdx == -1 {
+					i = i + 1 + end + 1
+					continue
+				}
 			}
 		}
 
 		// (source: ... ) or (from: ... )
 		if strRaw[i] == '(' {
 			if strings.HasPrefix(strRaw[i:], "(source: ") || strings.HasPrefix(strRaw[i:], "(from: ") {
-				end := -1
-				for j := i + 1; j < len(strRaw); j++ {
-					if strRaw[j] == ')' {
-						end = j
-						break
-					}
-				}
+				end := strings.IndexByte(strRaw[i+1:], ')')
 				if end != -1 {
-					b = append(b, ' ')
-					i = end + 1
-					continue
+					newlineIdx := strings.IndexByte(strRaw[i+1:i+1+end], '\n')
+					if newlineIdx == -1 {
+						b = append(b, ' ')
+						i = i + 1 + end + 1
+						continue
+					}
 				}
 			}
 		}
 
 		// <[^>]*>
 		if strRaw[i] == '<' {
-			end := -1
-			for j := i + 1; j < len(strRaw); j++ {
-				if strRaw[j] == '>' {
-					end = j
-					break
-				}
-			}
+			end := strings.IndexByte(strRaw[i+1:], '>')
 			if end != -1 {
-				b = append(b, ' ')
-				i = end + 1
-				continue
+				newlineIdx := strings.IndexByte(strRaw[i+1:i+1+end], '\n')
+				if newlineIdx == -1 {
+					b = append(b, ' ')
+					i = i + 1 + end + 1
+					continue
+				}
 			}
 		}
 
