@@ -57,13 +57,18 @@ func InsertSimilarData(similarData internal.SimilarManga) {
 func getDBSimilar() iter.Seq[internal.DbSimilar] {
 	return func(yield func(internal.DbSimilar) bool) {
 		rows, err := internal.DB.Query("SELECT UUID, JSON FROM SIMILAR ORDER BY UUID ASC")
-		internal.CheckErr(err)
+		if err != nil {
+			log.Printf("ERROR: failed to query similar: %v", err)
+			return
+		}
 		defer rows.Close() // Safely clean up the database rows iterator
 
 		for rows.Next() {
 			similar := internal.DbSimilar{}
-			err = rows.Scan(&similar.Id, &similar.JSON)
-			internal.CheckErr(err)
+			if err := rows.Scan(&similar.Id, &similar.JSON); err != nil {
+				log.Printf("ERROR: failed to scan similar row: %v", err)
+				continue
+			}
 
 			// Yield the row to the caller's loop. If the caller breaks out early,
 			// yield returns false and we safely terminate, triggering the defer rows.Close()
@@ -71,7 +76,9 @@ func getDBSimilar() iter.Seq[internal.DbSimilar] {
 				return
 			}
 		}
-		internal.CheckErr(rows.Err())
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: error iterating similar rows: %v", err)
+		}
 	}
 }
 
