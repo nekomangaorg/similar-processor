@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 )
 
 var reg02 = regexp.MustCompile(`\[.*?]`)
@@ -32,7 +32,7 @@ func mycleanBytesFull(strRaw string) string {
 }
 
 func main() {
-    input := "Nested [a  c] text"
-    fmt.Printf("regex: %q\n", reg02.ReplaceAllString(input, ""))
-    fmt.Printf("mine: %q\n", mycleanBytesFull(input))
+	input := "Nested [a  c] text"
+	fmt.Printf("regex: %q\n", reg02.ReplaceAllString(input, ""))
+	fmt.Printf("mine: %q\n", mycleanBytesFull(input))
 }

@@ -40,17 +40,17 @@ func filterTextTags(strRaw string) string {
 }
 
 func main() {
-    strRaw := "Nested [a [b] c] text"
+	strRaw := "Nested [a [b] c] text"
 
-    // BBCodes stripping
-    for _, tag := range BBCodes {
+	// BBCodes stripping
+	for _, tag := range BBCodes {
 		strRaw = strings.ReplaceAll(strRaw, tag, "")
 	}
 
-    fmt.Printf("After BBCodes: %q\n", strRaw)
+	fmt.Printf("After BBCodes: %q\n", strRaw)
 
-    // Then my code:
-    strRaw = filterTextTags(strRaw)
+	// Then my code:
+	strRaw = filterTextTags(strRaw)
 
-    fmt.Printf("After filterTextTags: %q\n", strRaw)
+	fmt.Printf("After filterTextTags: %q\n", strRaw)
 }

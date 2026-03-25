@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/similar-manga/similar/internal"
+	"iter"
 	"log"
 	"os"
 	"path/filepath"
@@ -48,20 +49,30 @@ func InsertSimilarData(similarData internal.SimilarManga) {
 	internal.CheckErr(err)
 }
 
-func getDBSimilar() []internal.DbSimilar {
-	rows, err := internal.DB.Query("SELECT UUID, JSON FROM SIMILAR ORDER BY UUID ASC")
-	internal.CheckErr(err)
-	defer rows.Close()
-
-	var similarList []internal.DbSimilar
-	for rows.Next() {
-		similar := internal.DbSimilar{}
-		err = rows.Scan(&similar.Id, &similar.JSON)
+// getDBSimilar streams similar manga entries from the database using an iterator.
+// Overclock optimization: Previously, this loaded the entire 'SIMILAR' table into memory
+// as a slice before returning, causing an O(n) memory spike and large GC pressure on large datasets.
+// By returning an iter.Seq, we turn the batch load into an O(1) streaming pipeline, allowing
+// the caller to process and export records as they are yielded directly from the database connection.
+func getDBSimilar() iter.Seq[internal.DbSimilar] {
+	return func(yield func(internal.DbSimilar) bool) {
+		rows, err := internal.DB.Query("SELECT UUID, JSON FROM SIMILAR ORDER BY UUID ASC")
 		internal.CheckErr(err)
-		similarList = append(similarList, similar)
+		defer rows.Close() // Safely clean up the database rows iterator
+
+		for rows.Next() {
+			similar := internal.DbSimilar{}
+			err = rows.Scan(&similar.Id, &similar.JSON)
+			internal.CheckErr(err)
+
+			// Yield the row to the caller's loop. If the caller breaks out early,
+			// yield returns false and we safely terminate, triggering the defer rows.Close()
+			if !yield(similar) {
+				return
+			}
+		}
+		internal.CheckErr(rows.Err())
 	}
-	internal.CheckErr(rows.Err())
-	return similarList
 }
 
 func WriteLineToDebugFile(fileName string, line string) {

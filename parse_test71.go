@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 )
 
 var BBCodes = []string{
@@ -18,18 +18,18 @@ var BBCodes = []string{
 }
 
 func main() {
-    strRaw := "Nested [a [b] c] text"
+	strRaw := "Nested [a [b] c] text"
 
-    // BBCodes stripping
-    for _, tag := range BBCodes {
+	// BBCodes stripping
+	for _, tag := range BBCodes {
 		strRaw = strings.ReplaceAll(strRaw, tag, "")
 	}
 
-    fmt.Printf("After BBCodes: %q\n", strRaw)
+	fmt.Printf("After BBCodes: %q\n", strRaw)
 
-    // Then reg02:
-    reg02 := regexp.MustCompile(`\[.*?]`)
-    strRaw = reg02.ReplaceAllString(strRaw, "")
+	// Then reg02:
+	reg02 := regexp.MustCompile(`\[.*?]`)
+	strRaw = reg02.ReplaceAllString(strRaw, "")
 
-    fmt.Printf("After reg02: %q\n", strRaw)
+	fmt.Printf("After reg02: %q\n", strRaw)
 }

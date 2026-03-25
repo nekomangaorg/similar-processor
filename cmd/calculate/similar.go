@@ -572,7 +572,7 @@ func exportSimilar() {
 	var currentSuffix string
 	var currentFolder string
 
-	for _, sim := range similarList {
+	for sim := range similarList {
 		if len(sim.Id) < 3 {
 			continue
 		}
