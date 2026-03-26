@@ -140,31 +140,30 @@ func printProgress(current, total int) {
 }
 
 func collectAllMangaIds() [][]string {
-	var mangaIdArray [][]string
-	processing := true
-	dbOffset := 0
+	rows, err := internal.DB.Query("SELECT UUID FROM " + internal.TableManga + " ORDER BY UUID ASC")
+	internal.CheckErr(err)
+	defer rows.Close()
 
-	for processing {
-		rows, err := internal.DB.Query("SELECT UUID FROM "+internal.TableManga+" ORDER BY UUID LIMIT 100 OFFSET ?", dbOffset)
+	var mangaIdArray [][]string
+currentChunk := make([]string, 0, 100)
+
+	for rows.Next() {
+		var uuid string
+		err = rows.Scan(&uuid)
 		internal.CheckErr(err)
 
-		var mangaIds []string
-		for rows.Next() {
-			var uuid string
-			err = rows.Scan(&uuid)
-			internal.CheckErr(err)
-			mangaIds = append(mangaIds, uuid)
-		}
-		internal.CheckErr(rows.Err())
-		rows.Close()
+		currentChunk = append(currentChunk, uuid)
 
-		if len(mangaIds) == 0 {
-			processing = false
-			break
+		if len(currentChunk) == 100 {
+			mangaIdArray = append(mangaIdArray, currentChunk)
+currentChunk = make([]string, 0, 100)
 		}
-
-		mangaIdArray = append(mangaIdArray, mangaIds)
-		dbOffset = dbOffset + 100
 	}
+	internal.CheckErr(rows.Err())
+
+	if len(currentChunk) > 0 {
+		mangaIdArray = append(mangaIdArray, currentChunk)
+	}
+
 	return mangaIdArray
 }
