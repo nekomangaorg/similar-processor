@@ -156,7 +156,7 @@ currentChunk := make([]string, 0, 100)
 
 		if len(currentChunk) == 100 {
 			mangaIdArray = append(mangaIdArray, currentChunk)
-			currentChunk = nil
+currentChunk = make([]string, 0, 100)
 		}
 	}
 	internal.CheckErr(rows.Err())
