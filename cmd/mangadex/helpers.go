@@ -228,11 +228,13 @@ func ExportManga() {
 	index := 0
 	for manga := range mangaList {
 		if index > 0 && index%1000 == 0 {
-			if err := writer.Flush(); err != nil {
-				log.Fatal(err)
+            flushErr := writer.Flush()
+			closeErr := file.Close()
+			if flushErr != nil {
+				log.Fatalf("Error flushing writer: %v. File close error: %v", flushErr, closeErr)
 			}
-			if err := file.Close(); err != nil {
-				log.Fatal(err)
+			if closeErr != nil {
+				log.Fatalf("Error closing file: %v", closeErr)
 			}
 			suffix++
 			file = createMangaFile(suffix)
