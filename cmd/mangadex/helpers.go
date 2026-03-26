@@ -239,7 +239,7 @@ func ExportManga() {
 			writer = bufio.NewWriter(file)
 		}
 
-		if _, err := writer.WriteString(manga.Id + ":::||@!@||:::" + manga.DATE + ":::||@!@||:::" + manga.JSON + "\n"); err != nil {
+if _, err := fmt.Fprintf(writer, "%s:::||@!@||:::%s:::||@!@||:::%s\n", manga.Id, manga.DATE, manga.JSON); err != nil {
 			log.Fatal(err)
 		}
 		index++
