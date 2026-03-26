@@ -1,6 +1,7 @@
 package mangadex
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"github.com/similar-manga/similar/internal"
 	"github.com/similar-manga/similar/mangadex"
 	"go.uber.org/ratelimit"
+	"iter"
 	"log"
 	"net/http"
 	"os"
@@ -183,42 +185,72 @@ func BatchUpsertManga(mangas []mangadex.Manga) {
 	internal.CheckErr(err)
 }
 
-func getDBManga() []internal.DbManga {
-	rows, err := internal.DB.Query("SELECT UUID, JSON, DATE FROM " + internal.TableManga + " ORDER BY DATE ASC")
-	internal.CheckErr(err)
-	defer rows.Close()
+func getDBManga() iter.Seq[internal.DbManga] {
+	return func(yield func(internal.DbManga) bool) {
+		rows, err := internal.DB.Query("SELECT UUID, JSON, DATE FROM " + internal.TableManga + " ORDER BY DATE ASC")
+		if err != nil {
+			log.Printf("ERROR: failed to query manga: %v", err)
+			return
+		}
+		defer rows.Close()
 
-	var mangaList []internal.DbManga
-	for rows.Next() {
-		manga := internal.DbManga{}
-		err = rows.Scan(&manga.Id, &manga.JSON, &manga.DATE)
-		internal.CheckErr(err)
-		mangaList = append(mangaList, manga)
+		for rows.Next() {
+			manga := internal.DbManga{}
+			if err := rows.Scan(&manga.Id, &manga.JSON, &manga.DATE); err != nil {
+				log.Printf("ERROR: failed to scan manga row: %v", err)
+				continue
+			}
+
+			if !yield(manga) {
+				return
+			}
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: error iterating manga rows: %v", err)
+		}
 	}
-	internal.CheckErr(rows.Err())
-	return mangaList
 }
 
 func ExportManga() {
 	fmt.Printf("Exporting All Manga to txt files\n")
-	os.RemoveAll("data/manga/")
-	os.MkdirAll("data/manga/", 0777)
+	if err := os.RemoveAll("data/manga/"); err != nil {
+		log.Printf("Warning: failed to remove manga dir: %v", err)
+	}
+	if err := os.MkdirAll("data/manga/", 0755); err != nil {
+		log.Fatal(err)
+	}
+
 	mangaList := getDBManga()
 	suffix := 1
 	file := createMangaFile(suffix)
-	for index, manga := range mangaList {
+	writer := bufio.NewWriter(file)
+
+	index := 0
+	for manga := range mangaList {
 		if index > 0 && index%1000 == 0 {
+			if err := writer.Flush(); err != nil {
+				log.Fatal(err)
+			}
+			if err := file.Close(); err != nil {
+				log.Fatal(err)
+			}
 			suffix++
-			file.Close()
 			file = createMangaFile(suffix)
+			writer = bufio.NewWriter(file)
 		}
 
-		file.WriteString(manga.Id + ":::||@!@||:::" + manga.DATE + ":::||@!@||:::" + manga.JSON + "\n")
-
+		if _, err := writer.WriteString(manga.Id + ":::||@!@||:::" + manga.DATE + ":::||@!@||:::" + manga.JSON + "\n"); err != nil {
+			log.Fatal(err)
+		}
+		index++
 	}
 
-	file.Close()
-
+	if err := writer.Flush(); err != nil {
+		log.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func createMangaFile(number int) *os.File {
