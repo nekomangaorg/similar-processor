@@ -145,7 +145,7 @@ func collectAllMangaIds() [][]string {
 	defer rows.Close()
 
 	var mangaIdArray [][]string
-currentChunk := make([]string, 0, 100)
+	currentChunk := make([]string, 0, 100)
 
 	for rows.Next() {
 		var uuid string
@@ -156,7 +156,7 @@ currentChunk := make([]string, 0, 100)
 
 		if len(currentChunk) == 100 {
 			mangaIdArray = append(mangaIdArray, currentChunk)
-currentChunk = make([]string, 0, 100)
+			currentChunk = make([]string, 0, 100)
 		}
 	}
 	internal.CheckErr(rows.Err())
