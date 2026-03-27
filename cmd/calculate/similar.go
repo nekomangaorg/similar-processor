@@ -457,12 +457,12 @@ func processManga(idx int, data *SimilarityData, config processingConfig, progre
 			dDesc = 0
 		}
 
-        if dDesc < IgnoreDescScoreUnder || data.CorpusDescLength[i] < MinDescriptionWords {
-            dDesc = 0
-        }
-        if len(data.MangaList[i].Tags) < IgnoreTagsUnderCount || dDesc > AcceptDescScoreOver {
-            dTag = 1
-        }
+		if dDesc < IgnoreDescScoreUnder || data.CorpusDescLength[i] < MinDescriptionWords {
+			dDesc = 0
+		}
+		if len(data.MangaList[i].Tags) < IgnoreTagsUnderCount || dDesc > AcceptDescScoreOver {
+			dTag = 1
+		}
 
 		score := TagScoreRatio*dTag + dDesc
 		if score <= 0 {
@@ -520,21 +520,10 @@ func invalidForProcessing(match customMatch, currentIdx int, current, target int
 		return true, "Same UUID"
 	}
 
-	common := false
-	for _, l1 := range current.AvailableTranslatedLanguages {
-		for _, l2 := range target.AvailableTranslatedLanguages {
-			if l1 == l2 {
-				common = true
-				break
-			}
-		}
-		if common {
-			break
-		}
-	}
-	if !common && len(current.AvailableTranslatedLanguages) > 0 {
-		return true, "No Common Languages"
-	}
+	// Performance Optimization:
+	// We no longer perform the O(N^2) language check here.
+	// It has been replaced by a bitmask check in the caller (processManga)
+	// which is significantly faster and handles the "No Common Languages" logic.
 
 	if similar.NotValidMatch(current, target) {
 		return true, "Tag Check"
