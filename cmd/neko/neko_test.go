@@ -1,13 +1,40 @@
 package neko
 
 import (
+	"bytes"
 	"database/sql"
+	"os"
+	"os/exec"
 	"slices"
+	"strings"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/similar-manga/similar/internal"
 )
+
+func TestGetAllMappings(t *testing.T) {
+	t.Run("invalid table name", func(t *testing.T) {
+		if os.Getenv("BE_CRASHER") == "1" {
+			getAllMappings("INVALID_TABLE")
+			return
+		}
+		cmd := exec.Command(os.Args[0], "-test.run=^TestGetAllMappings/invalid_table_name$")
+		cmd.Env = append(os.Environ(), "BE_CRASHER=1")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+
+		if e, ok := err.(*exec.ExitError); ok && !e.Success() {
+			const expectedLog = "getAllMappings: invalid table name"
+			if !strings.Contains(stderr.String(), expectedLog) {
+				t.Errorf("expected stderr to contain %q, got %q", expectedLog, stderr.String())
+			}
+			return
+		}
+		t.Fatalf("process ran with err %v, want exit status 1. stderr: %s", err, stderr.String())
+	})
+}
 
 func TestProcessMangaList(t *testing.T) {
 	// Setup Output DB

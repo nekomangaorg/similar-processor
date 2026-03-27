@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"io"
 	"iter"
+	"log"
 	"os"
 	"time"
 )
@@ -98,6 +99,13 @@ func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
 }
 
 func getAllMappings(table string) map[string]string {
+	switch table {
+	case internal.TableAnilist, internal.TableAnimePlanet, internal.TableBookWalker, internal.TableKitsu, internal.TableMyanimelist, internal.TableMangaupdates, internal.TableMangaupdatesNewId, internal.TableNovelUpdates:
+		// OK
+	default:
+		log.Fatalf("getAllMappings: invalid table name %s", table)
+	}
+
 	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + table)
 	internal.CheckErr(err)
 	defer rows.Close()
