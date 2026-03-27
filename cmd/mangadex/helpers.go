@@ -228,7 +228,7 @@ func ExportManga() {
 	index := 0
 	for manga := range mangaList {
 		if index > 0 && index%1000 == 0 {
-			flushErr := writer.Flush()
+            flushErr := writer.Flush()
 			closeErr := file.Close()
 			if flushErr != nil {
 				log.Fatalf("Error flushing writer: %v. File close error: %v", flushErr, closeErr)
@@ -241,7 +241,7 @@ func ExportManga() {
 			writer = bufio.NewWriter(file)
 		}
 
-		if _, err := fmt.Fprintf(writer, "%s:::||@!@||:::%s:::||@!@||:::%s\n", manga.Id, manga.DATE, manga.JSON); err != nil {
+if _, err := fmt.Fprintf(writer, "%s:::||@!@||:::%s:::||@!@||:::%s\n", manga.Id, manga.DATE, manga.JSON); err != nil {
 			log.Fatal(err)
 		}
 		index++
