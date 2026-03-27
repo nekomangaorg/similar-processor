@@ -1,34 +1,39 @@
 package calculate
 
 import (
-	"bytes"
 	"database/sql"
-	"fmt"
-	"os"
-	"os/exec"
 	"reflect"
-	"strings"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/similar-manga/similar/internal"
 )
 
-func TestGetAllGenericFromTable(t *testing.T) {
-	// Setup DB
+func setupTestDB(t *testing.T) (db *sql.DB, teardown func()) {
+	t.Helper()
+
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to open in-memory database: %v", err)
 	}
-	defer db.Close()
 
-	// Swap global DB
 	originalDB := internal.DB
 	internal.DB = db
-	defer func() { internal.DB = originalDB }()
+
+	teardown = func() {
+		internal.DB = originalDB
+		db.Close()
+	}
+
+	return db, teardown
+}
+
+func TestGetAllGenericFromTable(t *testing.T) {
+	db, teardown := setupTestDB(t)
+	defer teardown()
 
 	// Create an allowed table
-	_, err = db.Exec("CREATE TABLE " + internal.TableAnilist + " (UUID TEXT PRIMARY KEY, ID TEXT)")
+	_, err := db.Exec("CREATE TABLE " + internal.TableAnilist + " (UUID TEXT PRIMARY KEY, ID TEXT)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +57,10 @@ func TestGetAllGenericFromTable(t *testing.T) {
 	}
 
 	// Test happy path
-	result := getAllGenericFromTable(internal.TableAnilist)
+	result, err := getAllGenericFromTable(internal.TableAnilist)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if !reflect.DeepEqual(result, testData) {
 		t.Errorf("expected %v, got %v", testData, result)
@@ -60,23 +68,13 @@ func TestGetAllGenericFromTable(t *testing.T) {
 }
 
 func TestGetAllGenericFromTable_InvalidTable(t *testing.T) {
-	if os.Getenv("BE_CRASHER") == "1" {
-		getAllGenericFromTable("INVALID_TABLE")
-		return
+	_, err := getAllGenericFromTable("INVALID_TABLE")
+	if err == nil {
+		t.Fatal("expected an error for invalid table name, but got nil")
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run=^TestGetAllGenericFromTable_InvalidTable$")
-	cmd.Env = append(os.Environ(), "BE_CRASHER=1")
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	if e, ok := err.(*exec.ExitError); ok && !e.Success() {
-		expectedLog := "getAllGenericFromTable: invalid table name INVALID_TABLE"
-		if !strings.Contains(stderr.String(), expectedLog) {
-			t.Errorf("expected stderr to contain %q, got %q", expectedLog, stderr.String())
-		}
-		return // Test passed
+	expectedError := "getAllGenericFromTable: invalid table name INVALID_TABLE"
+	if err.Error() != expectedError {
+		t.Errorf("expected error %q, got %q", expectedError, err.Error())
 	}
-	t.Fatalf("process ran with err %v, want exit status 1. stderr: %s", err, stderr.String())
 }

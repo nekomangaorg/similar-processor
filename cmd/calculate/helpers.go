@@ -3,6 +3,7 @@ package calculate
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/similar-manga/similar/internal"
 	"iter"
 	"log"
@@ -92,7 +93,8 @@ func WriteLineToDebugFile(fileName string, line string) {
 }
 
 func exportMapping(tableName string, fileName string) {
-	genericList := getAllGenericFromTable(tableName)
+	genericList, err := getAllGenericFromTable(tableName)
+	internal.CheckErr(err)
 	exportGeneric(fileName, genericList)
 }
 
@@ -105,27 +107,33 @@ func exportGeneric(fileName string, genericList []internal.DbGeneric) {
 	file.Close()
 }
 
-func getAllGenericFromTable(tableName string) []internal.DbGeneric {
+func getAllGenericFromTable(tableName string) ([]internal.DbGeneric, error) {
 	switch tableName {
 	case internal.TableAnilist, internal.TableAnimePlanet, internal.TableBookWalker, internal.TableKitsu, internal.TableMyanimelist, internal.TableMangaupdates, internal.TableMangaupdatesNewId, internal.TableNovelUpdates:
 		// OK
 	default:
-		log.Fatalf("getAllGenericFromTable: invalid table name %s", tableName)
+		return nil, fmt.Errorf("getAllGenericFromTable: invalid table name %s", tableName)
 	}
 
 	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + tableName + " ORDER BY UUID asc ")
-	internal.CheckErr(err)
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	var genericList []internal.DbGeneric
 	for rows.Next() {
 		generic := internal.DbGeneric{}
 		err = rows.Scan(&generic.UUID, &generic.ID)
-		internal.CheckErr(err)
+		if err != nil {
+			return nil, err
+		}
 		genericList = append(genericList, generic)
 	}
-	internal.CheckErr(rows.Err())
-	return genericList
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return genericList, nil
 }
 
 func CreateMappingsFile(fileName string) *os.File {
