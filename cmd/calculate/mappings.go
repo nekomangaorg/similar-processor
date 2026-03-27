@@ -64,16 +64,38 @@ func runMappings(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-	defer tx.Rollback()
+	const batchSize = 1000
 
-	for _, u := range upserts {
-		UpsertGeneric(tx, u.tableName, u.uuid, u.id)
+	processBatch := func(batch []upsertData) {
+		if len(batch) == 0 {
+			return
+		}
+		tx, err := internal.DB.Begin()
+		if err != nil {
+			fmt.Printf("failed to begin transaction: %v\n", err)
+			return
+		}
+		defer tx.Rollback()
+
+		for _, u := range batch {
+			if err := UpsertGeneric(tx, u.tableName, u.uuid, u.id); err != nil {
+				fmt.Printf("failed to upsert item %s: %v\n", u.uuid, err)
+				continue
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			fmt.Printf("failed to commit transaction: %v\n", err)
+		}
 	}
 
-	err = tx.Commit()
-	internal.CheckErr(err)
+	for i := 0; i < len(upserts); i += batchSize {
+		end := i + batchSize
+		if end > len(upserts) {
+			end = len(upserts)
+		}
+		processBatch(upserts[i:end])
+	}
 
 	fmt.Println("Exporting mapping files...")
 	for _, m := range mappings {
