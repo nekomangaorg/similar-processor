@@ -44,21 +44,58 @@ func runMappings(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println("Calculating mappings...")
-	tx, err := internal.DB.Begin()
-	internal.CheckErr(err)
-	defer tx.Rollback()
 
+	type upsertData struct {
+		tableName string
+		uuid      string
+		id        string
+	}
+	var upserts []upsertData
 	for manga := range mangaStream {
 		for _, m := range mappings {
 			id := manga.Links[m.linkKey]
 			if id != "" {
-				UpsertGeneric(tx, m.tableName, manga.Id, id)
+				upserts = append(upserts, upsertData{
+					tableName: m.tableName,
+					uuid:      manga.Id,
+					id:        id,
+				})
 			}
 		}
 	}
 
-	err = tx.Commit()
-	internal.CheckErr(err)
+	const batchSize = 1000
+
+	processBatch := func(batch []upsertData) {
+		if len(batch) == 0 {
+			return
+		}
+		tx, err := internal.DB.Begin()
+		if err != nil {
+			fmt.Printf("failed to begin transaction: %v\n", err)
+			return
+		}
+		defer tx.Rollback()
+
+		for _, u := range batch {
+			if err := UpsertGeneric(tx, u.tableName, u.uuid, u.id); err != nil {
+				fmt.Printf("failed to upsert item %s: %v\n", u.uuid, err)
+				continue
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			fmt.Printf("failed to commit transaction: %v\n", err)
+		}
+	}
+
+	for i := 0; i < len(upserts); i += batchSize {
+		end := i + batchSize
+		if end > len(upserts) {
+			end = len(upserts)
+		}
+		processBatch(upserts[i:end])
+	}
 
 	fmt.Println("Exporting mapping files...")
 	for _, m := range mappings {
@@ -84,16 +121,29 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 	// https://api.mangaupdates.com/v1/series/(base38 encoding of 7char ids)
 	// https://api.mangaupdates.com/v1/series/66788345008/rss
 
+	// First collect muLinks to avoid locking the database connection
+	type muData struct {
+		uuid   string
+		muLink string
+	}
+	var muLinks []muData
+	for manga := range mangaList {
+		muLink := manga.Links["mu"]
+		if muLink != "" {
+			muLinks = append(muLinks, muData{
+				uuid:   manga.Id,
+				muLink: muLink,
+			})
+		}
+	}
+
 	// Loop through all manga and try to get their chapter information for each
 	start := time.Now()
 	var wg sync.WaitGroup
 	maxGoroutines := 1000
 	guard := make(chan struct{}, maxGoroutines)
 
-	index := 0
-	for manga := range mangaList {
-		muLink := manga.Links["mu"]
-
+	for index, data := range muLinks {
 		// would block if guard channel is already filled
 		guard <- struct{}{}
 
@@ -106,14 +156,11 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 			}()
 			// Our search file
 			defer wg.Done()
-			if muLink != "" {
-				if !AddAlreadyConvertedId(index, totalManga, uuid, muLink, rateLimiter) && !CheckAndAddLegacyId(index, totalManga, uuid, muLink, rateLimiter) {
-					fmt.Printf("%d/%d manga %s -> mu invalid %s\n", index+1, totalManga, uuid, muLink)
-				}
+			if !AddAlreadyConvertedId(index, totalManga, uuid, muLink, rateLimiter) && !CheckAndAddLegacyId(index, totalManga, uuid, muLink, rateLimiter) {
+				fmt.Printf("%d/%d manga %s -> mu invalid %s\n", index+1, totalManga, uuid, muLink)
 			}
 			<-guard
-		}(index, totalManga, manga.Id, muLink, rateLimiter)
-		index++
+		}(index, totalManga, data.uuid, data.muLink, rateLimiter)
 	}
 
 	wg.Wait()

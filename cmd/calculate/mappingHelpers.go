@@ -30,9 +30,9 @@ func upsertNewMuId(uuid string, id string) {
 	internal.CheckErr(err)
 }
 
-func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) {
+func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) error {
 	_, err := tx.Exec("INSERT INTO "+table+" (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
-	internal.CheckErr(err)
+	return err
 }
 
 func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
