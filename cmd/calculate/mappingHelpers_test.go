@@ -21,28 +21,34 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.RoundTripFunc(req)
 }
 
-func TestCheckAndAddLegacyId(t *testing.T) {
+func setupTestDBWithTable(t *testing.T) func() {
+	t.Helper()
 	_, teardown := setupTestDB(t)
-	defer teardown()
 
 	// Ensure the table exists
-	_, err := internal.DB.Exec("CREATE TABLE " + internal.TableMangaupdatesNewId + " (UUID TEXT PRIMARY KEY, ID TEXT)")
+	_, err := internal.DB.Exec("CREATE TABLE IF NOT EXISTS " + internal.TableMangaupdatesNewId + " (UUID TEXT PRIMARY KEY, ID TEXT)")
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
+	return teardown
+}
+
+func TestCheckAndAddLegacyId(t *testing.T) {
+	teardown := setupTestDBWithTable(t)
+	defer teardown()
 
 	// Save original client and restore after tests
 	oldClient := httpClient
 	defer func() { httpClient = oldClient }()
 
 	tests := []struct {
-		name          string
-		uuid          string
-		muLink        string
-		setupDB       func()
-		mockResp      func(req *http.Request) (*http.Response, error)
+		name           string
+		uuid           string
+		muLink         string
+		setupDB        func()
+		mockResp       func(req *http.Request) (*http.Response, error)
 		expectedResult bool
-		verify        func(t *testing.T)
+		verify         func(t *testing.T)
 	}{
 		{
 			name:   "Invalid muLink (no digits)",
@@ -117,8 +123,6 @@ func TestCheckAndAddLegacyId(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to find entry in DB: %v", err)
 				}
-				// Note: the code upserts convertedId (11111) not rssId (22222) if I read it correctly
-				// upsertNewMuId(uuid, convertedId)
 				if id != "11111" {
 					t.Errorf("expected ID 11111, got %s", id)
 				}
@@ -146,14 +150,16 @@ func TestCheckAndAddLegacyId(t *testing.T) {
 			expectedResult: false,
 			verify: func(t *testing.T) {
 				debugFile := filepath.Join("debug", "BadMUIds.txt")
-				if _, err := os.Stat(debugFile); os.IsNotExist(err) {
-					t.Errorf("expected debug file %s to exist", debugFile)
+				t.Cleanup(func() { _ = os.Remove(debugFile) })
+
+				content, err := os.ReadFile(debugFile)
+				if err != nil {
+					t.Errorf("expected debug file %s to exist and be readable: %v", debugFile, err)
+					return
 				}
-				content, _ := os.ReadFile(debugFile)
 				if !strings.Contains(string(content), "https://mangadex.org/title/uuid5") {
 					t.Errorf("debug file does not contain expected link")
 				}
-				_ = os.Remove(debugFile)
 			},
 		},
 	}
@@ -186,13 +192,8 @@ func TestCheckAndAddLegacyId(t *testing.T) {
 }
 
 func TestCheckAndAddLegacyId_Retry429(t *testing.T) {
-	_, teardown := setupTestDB(t)
+	teardown := setupTestDBWithTable(t)
 	defer teardown()
-
-	_, err := internal.DB.Exec("CREATE TABLE " + internal.TableMangaupdatesNewId + " (UUID TEXT PRIMARY KEY, ID TEXT)")
-	if err != nil {
-		t.Fatalf("failed to create table: %v", err)
-	}
 
 	oldClient := httpClient
 	defer func() { httpClient = oldClient }()
@@ -226,10 +227,6 @@ func TestCheckAndAddLegacyId_Retry429(t *testing.T) {
 			},
 		},
 	}
-
-	// We use a small muLink that will trigger the retry.
-	// We might want to mock time.Sleep to avoid the 2s delay, but for now we'll just wait.
-	// Actually, let's just test that it retries.
 
 	result := CheckAndAddLegacyId(0, 1, "uuid_retry", "https://www.mangaupdates.com/series.html?id=99999", ratelimit.NewUnlimited())
 
