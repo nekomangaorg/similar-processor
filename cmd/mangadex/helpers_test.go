@@ -24,6 +24,14 @@ func setupTestDB(tb testing.TB) *sql.DB {
 	if err != nil {
 		tb.Fatal(err)
 	}
+
+	oldDB := internal.DB
+	internal.DB = db
+	tb.Cleanup(func() {
+		_ = db.Close()
+		internal.DB = oldDB
+	})
+
 	_, err = db.Exec("CREATE TABLE " + internal.TableManga + " (UUID TEXT PRIMARY KEY, JSON TEXT, DATE TEXT)")
 	if err != nil {
 		tb.Fatal(err)
@@ -46,9 +54,7 @@ func setupTestDB(tb testing.TB) *sql.DB {
 }
 
 func BenchmarkExistsInDatabase(b *testing.B) {
-	db := setupTestDB(b)
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -57,9 +63,7 @@ func BenchmarkExistsInDatabase(b *testing.B) {
 }
 
 func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
-	db := setupTestDB(b)
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(b)
 
 	batchSize := 100
 	b.ResetTimer()
@@ -74,9 +78,7 @@ func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
 }
 
 func TestExistsInDatabase(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(t)
 
 	// Test existing
 	if !ExistsInDatabase("uuid-1") {
@@ -90,9 +92,7 @@ func TestExistsInDatabase(t *testing.T) {
 }
 
 func TestGetExistingMangaUUIDs(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(t)
 
 	uuids := []string{"uuid-1", "uuid-2", "uuid-9999"}
 	existing := GetExistingMangaUUIDs(uuids)
@@ -112,9 +112,7 @@ func TestGetExistingMangaUUIDs(t *testing.T) {
 }
 
 func TestGetExistingMangaUUIDs_Chunking(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(t)
 
 	// setupTestDB adds 1000 UUIDs (uuid-0 to uuid-999)
 	// We pass 1100 UUIDs to test chunking (chunk size is 900)
