@@ -18,26 +18,27 @@ func init() {
 	}
 }
 
-func setupTestDB() *sql.DB {
+func setupTestDB(tb testing.TB) *sql.DB {
+	tb.Helper()
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	_, err = db.Exec("CREATE TABLE " + internal.TableManga + " (UUID TEXT PRIMARY KEY, JSON TEXT, DATE TEXT)")
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 
 	stmt, err := db.Prepare("INSERT INTO " + internal.TableManga + " (UUID, JSON, DATE) VALUES (?, ?, ?)")
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	defer stmt.Close()
 
 	for _, uuid := range testUUIDs {
 		_, err = stmt.Exec(uuid, "{}", "2023-01-01")
 		if err != nil {
-			panic(err)
+			tb.Fatal(err)
 		}
 	}
 
@@ -45,7 +46,7 @@ func setupTestDB() *sql.DB {
 }
 
 func BenchmarkExistsInDatabase(b *testing.B) {
-	db := setupTestDB()
+	db := setupTestDB(b)
 	defer db.Close()
 	internal.DB = db
 
@@ -56,7 +57,7 @@ func BenchmarkExistsInDatabase(b *testing.B) {
 }
 
 func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
-	db := setupTestDB()
+	db := setupTestDB(b)
 	defer db.Close()
 	internal.DB = db
 
@@ -73,7 +74,7 @@ func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
 }
 
 func TestExistsInDatabase(t *testing.T) {
-	db := setupTestDB()
+	db := setupTestDB(t)
 	defer db.Close()
 	internal.DB = db
 
@@ -89,7 +90,7 @@ func TestExistsInDatabase(t *testing.T) {
 }
 
 func TestGetExistingMangaUUIDs(t *testing.T) {
-	db := setupTestDB()
+	db := setupTestDB(t)
 	defer db.Close()
 	internal.DB = db
 
@@ -111,7 +112,7 @@ func TestGetExistingMangaUUIDs(t *testing.T) {
 }
 
 func TestGetExistingMangaUUIDs_Chunking(t *testing.T) {
-	db := setupTestDB()
+	db := setupTestDB(t)
 	defer db.Close()
 	internal.DB = db
 
