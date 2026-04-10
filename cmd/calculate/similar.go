@@ -67,6 +67,8 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	threads, _ := cmd.Flags().GetInt("threads")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
+	defer CloseDebugFiles()
+
 	if !exportOnly {
 		fmt.Printf("\nBegin calculating similars\n")
 		calculateSimilars(debugMode, skippedMode, threads, verbose)

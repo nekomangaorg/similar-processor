@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -83,13 +84,56 @@ func getDBSimilar() iter.Seq[internal.DbSimilar] {
 	}
 }
 
+var (
+	debugFiles sync.Map
+)
+
+type debugWriter struct {
+	file *os.File
+	mu   sync.Mutex
+	buf  *bufio.Writer
+}
+
 func WriteLineToDebugFile(fileName string, line string) {
-	os.MkdirAll("debug", 0700)
-	file, err := os.OpenFile(filepath.Join("debug", filepath.Base(fileName)+".txt"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	actualName := filepath.Base(fileName)
+	dw, ok := debugFiles.Load(actualName)
+	if !ok {
+		os.MkdirAll("debug", 0700)
+		file, err := os.OpenFile(filepath.Join("debug", actualName+".txt"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		internal.CheckErr(err)
+		dw = &debugWriter{
+			file: file,
+			buf:  bufio.NewWriter(file),
+		}
+		actual, loaded := debugFiles.LoadOrStore(actualName, dw)
+		if loaded {
+			file.Close()
+			dw = actual
+		} else {
+			dw = actual
+		}
+	}
+
+	d := dw.(*debugWriter)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.buf.WriteString(line + "\n")
 	internal.CheckErr(err)
-	_, err = file.WriteString(line + "\n")
+	err = d.buf.Flush()
 	internal.CheckErr(err)
-	file.Close()
+}
+
+// CloseDebugFiles flushes and closes all open debug file handles.
+func CloseDebugFiles() {
+	debugFiles.Range(func(key, value any) bool {
+		d := value.(*debugWriter)
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_ = d.buf.Flush()
+		_ = d.file.Close()
+		debugFiles.Delete(key)
+		return true
+	})
 }
 
 func exportMapping(tableName string, fileName string) {
