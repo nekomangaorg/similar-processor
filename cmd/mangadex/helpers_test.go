@@ -200,14 +200,14 @@ func TestApiMangaToJson(t *testing.T) {
 	if result.Id != apiManga.Id {
 		t.Errorf("Expected Id %s, got %s", apiManga.Id, result.Id)
 	}
-	if (*result.Title)["en"] != (*apiManga.Attributes.Title)["en"] {
-		t.Errorf("Expected Title %s, got %s", (*apiManga.Attributes.Title)["en"], (*result.Title)["en"])
+	if result.Title == nil || (*result.Title)["en"] != (*apiManga.Attributes.Title)["en"] {
+		t.Errorf("Expected Title %v, got %v", apiManga.Attributes.Title, result.Title)
 	}
 	if len(result.AltTitles) != len(apiManga.Attributes.AltTitles) || result.AltTitles[0]["ja"] != apiManga.Attributes.AltTitles[0]["ja"] {
 		t.Errorf("Expected AltTitles %v, got %v", apiManga.Attributes.AltTitles, result.AltTitles)
 	}
-	if (*result.Description)["en"] != (*apiManga.Attributes.Description)["en"] {
-		t.Errorf("Expected Description %s, got %s", (*apiManga.Attributes.Description)["en"], (*result.Description)["en"])
+	if result.Description == nil || (*result.Description)["en"] != (*apiManga.Attributes.Description)["en"] {
+		t.Errorf("Expected Description %v, got %v", apiManga.Attributes.Description, result.Description)
 	}
 	if result.LastChapter != apiManga.Attributes.LastChapter {
 		t.Errorf("Expected LastChapter %s, got %s", apiManga.Attributes.LastChapter, result.LastChapter)
@@ -235,8 +235,8 @@ func TestApiMangaToJson(t *testing.T) {
 		if result.Tags[0].Id != apiManga.Attributes.Tags[0].Id {
 			t.Errorf("Expected Tag Id %s, got %s", apiManga.Attributes.Tags[0].Id, result.Tags[0].Id)
 		}
-		if (*result.Tags[0].Name)["en"] != (*apiManga.Attributes.Tags[0].Attributes.Name)["en"] {
-			t.Errorf("Expected Tag Name %s, got %s", (*apiManga.Attributes.Tags[0].Attributes.Name)["en"], (*result.Tags[0].Name)["en"])
+		if result.Tags[0].Name == nil || (*result.Tags[0].Name)["en"] != (*apiManga.Attributes.Tags[0].Attributes.Name)["en"] {
+			t.Errorf("Expected Tag Name %v, got %v", apiManga.Attributes.Tags[0].Attributes.Name, result.Tags[0].Name)
 		}
 	}
 
