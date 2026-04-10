@@ -1,12 +1,14 @@
 package mangadex
 
 import (
+	"encoding/json"
 	"database/sql"
 	"fmt"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/similar-manga/similar/internal"
+	md "github.com/similar-manga/similar/mangadex"
 )
 
 var testUUIDs []string
@@ -143,5 +145,104 @@ func TestGetExistingMangaUUIDs_Chunking(t *testing.T) {
 	}
 	if existing["uuid-1000"] {
 		t.Error("uuid-1000 should not exist")
+	}
+}
+
+func TestApiMangaToJson(t *testing.T) {
+	title := map[string]string{"en": "Test Title"}
+	altTitles := []map[string]string{{"ja": "テストタイトル"}}
+	description := map[string]string{"en": "Test Description"}
+	links := map[string]string{"amz": "https://amazon.com"}
+	tagName := map[string]string{"en": "Action"}
+
+	apiManga := md.Manga{
+		Id: "manga-uuid",
+		Attributes: &md.MangaAttributes{
+			Title:                        &title,
+			AltTitles:                    altTitles,
+			Description:                  &description,
+			LastChapter:                  "100",
+			AvailableTranslatedLanguages: []string{"en", "ja"},
+			Links:                        links,
+			OriginalLanguage:             "ja",
+			PublicationDemographic:       "shounen",
+			ContentRating:                "safe",
+			Tags: []md.Tag{
+				{
+					Id: "tag-uuid",
+					Attributes: &md.TagAttributes{
+						Name: &tagName,
+					},
+				},
+			},
+		},
+		Relationships: []md.Relationship{
+			{
+				Id:      "related-uuid-1",
+				Related: "monochrome",
+			},
+			{
+				Id:      "related-uuid-2",
+				Related: "", // Should be filtered out
+			},
+		},
+	}
+
+	jsonBytes := ApiMangaToJson(apiManga)
+
+	var result internal.Manga
+	err := json.Unmarshal(jsonBytes, &result)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	if result.Id != apiManga.Id {
+		t.Errorf("Expected Id %s, got %s", apiManga.Id, result.Id)
+	}
+	if result.Title == nil || (*result.Title)["en"] != (*apiManga.Attributes.Title)["en"] {
+		t.Errorf("Expected Title %v, got %v", apiManga.Attributes.Title, result.Title)
+	}
+	if len(result.AltTitles) != len(apiManga.Attributes.AltTitles) || result.AltTitles[0]["ja"] != apiManga.Attributes.AltTitles[0]["ja"] {
+		t.Errorf("Expected AltTitles %v, got %v", apiManga.Attributes.AltTitles, result.AltTitles)
+	}
+	if result.Description == nil || (*result.Description)["en"] != (*apiManga.Attributes.Description)["en"] {
+		t.Errorf("Expected Description %v, got %v", apiManga.Attributes.Description, result.Description)
+	}
+	if result.LastChapter != apiManga.Attributes.LastChapter {
+		t.Errorf("Expected LastChapter %s, got %s", apiManga.Attributes.LastChapter, result.LastChapter)
+	}
+	if len(result.AvailableTranslatedLanguages) != len(apiManga.Attributes.AvailableTranslatedLanguages) || result.AvailableTranslatedLanguages[0] != apiManga.Attributes.AvailableTranslatedLanguages[0] {
+		t.Errorf("Expected AvailableTranslatedLanguages %v, got %v", apiManga.Attributes.AvailableTranslatedLanguages, result.AvailableTranslatedLanguages)
+	}
+	if result.Links["amz"] != apiManga.Attributes.Links["amz"] {
+		t.Errorf("Expected Links %v, got %v", apiManga.Attributes.Links, result.Links)
+	}
+	if result.OriginalLanguage != apiManga.Attributes.OriginalLanguage {
+		t.Errorf("Expected OriginalLanguage %s, got %s", apiManga.Attributes.OriginalLanguage, result.OriginalLanguage)
+	}
+	if result.PublicationDemographic != apiManga.Attributes.PublicationDemographic {
+		t.Errorf("Expected PublicationDemographic %s, got %s", apiManga.Attributes.PublicationDemographic, result.PublicationDemographic)
+	}
+	if result.ContentRating != apiManga.Attributes.ContentRating {
+		t.Errorf("Expected ContentRating %s, got %s", apiManga.Attributes.ContentRating, result.ContentRating)
+	}
+
+	// Tags
+	if len(result.Tags) != 1 {
+		t.Errorf("Expected 1 tag, got %d", len(result.Tags))
+	} else {
+		if result.Tags[0].Id != apiManga.Attributes.Tags[0].Id {
+			t.Errorf("Expected Tag Id %s, got %s", apiManga.Attributes.Tags[0].Id, result.Tags[0].Id)
+		}
+		if result.Tags[0].Name == nil || (*result.Tags[0].Name)["en"] != (*apiManga.Attributes.Tags[0].Attributes.Name)["en"] {
+			t.Errorf("Expected Tag Name %v, got %v", apiManga.Attributes.Tags[0].Attributes.Name, result.Tags[0].Name)
+		}
+	}
+
+	// RelatedIds
+	if len(result.RelatedIds) != 1 {
+		t.Errorf("Expected 1 related ID, got %d", len(result.RelatedIds))
+	} else if result.RelatedIds[0] != "related-uuid-1" {
+		t.Errorf("Expected related ID related-uuid-1, got %s", result.RelatedIds[0])
 	}
 }
