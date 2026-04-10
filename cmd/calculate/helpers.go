@@ -94,13 +94,17 @@ type debugWriter struct {
 	buf  *bufio.Writer
 }
 
-func WriteLineToDebugFile(fileName string, line string) {
+func WriteLineToDebugFile(fileName string, line string) error {
 	actualName := filepath.Base(fileName)
 	dw, ok := debugFiles.Load(actualName)
 	if !ok {
-		os.MkdirAll("debug", 0700)
+		if err := os.MkdirAll("debug", 0700); err != nil {
+			return err
+		}
 		file, err := os.OpenFile(filepath.Join("debug", actualName+".txt"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-		internal.CheckErr(err)
+		if err != nil {
+			return err
+		}
 		dw = &debugWriter{
 			file: file,
 			buf:  bufio.NewWriter(file),
@@ -109,18 +113,16 @@ func WriteLineToDebugFile(fileName string, line string) {
 		if loaded {
 			file.Close()
 			dw = actual
-		} else {
-			dw = actual
 		}
 	}
 
 	d := dw.(*debugWriter)
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	_, err := d.buf.WriteString(line + "\n")
-	internal.CheckErr(err)
-	err = d.buf.Flush()
-	internal.CheckErr(err)
+	if _, err := d.buf.WriteString(line); err != nil {
+		return err
+	}
+	return d.buf.WriteByte('\n')
 }
 
 // CloseDebugFiles flushes and closes all open debug file handles.
