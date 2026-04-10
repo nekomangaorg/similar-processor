@@ -19,6 +19,17 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
+const muUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
+
+func muGet(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("User-Agent", muUserAgent)
+	return httpClient.Do(req)
+}
+
 func muEntryExistsInNewIDDatabase(uuid string) bool {
 	rows, err := internal.DB.Query("SELECT UUID FROM "+internal.TableMangaupdatesNewId+" WHERE UUID= ?", uuid)
 	internal.CheckErr(err)
@@ -48,7 +59,7 @@ func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rat
 
 		// Try the new id!
 		rateLimiter.Take()
-		resp2, err := httpClient.Get("https://api.mangaupdates.com/v1/series/" + url.PathEscape(base10Id))
+		resp2, err := muGet("https://api.mangaupdates.com/v1/series/" + url.PathEscape(base10Id))
 		if err != nil {
 			fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to get new id %s: %v\u001B[0m\n", uuid, base10Id, err)
 			return false
@@ -84,7 +95,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 		rateLimiter.Take()
 		// Try the existing as the id (not likely since mangadex won't have updated..)
-		resp1, err1 := httpClient.Get("https://api.mangaupdates.com/v1/series/" + url.PathEscape(convertedId))
+		resp1, err1 := muGet("https://api.mangaupdates.com/v1/series/" + url.PathEscape(convertedId))
 
 		if err1 == nil && resp1.StatusCode == 200 {
 			drainAndClose(resp1)
@@ -108,13 +119,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 				// If invalid, then try to get the page and parse it!
 				// Query and get our html... (no api to get this...)
 				muUrl := "https://www.mangaupdates.com/series.html?id=" + url.QueryEscape(convertedId)
-				req, err := http.NewRequest("GET", muUrl, nil)
-				if err != nil {
-					fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to create request for %s: %v\u001B[0m\n", uuid, muUrl, err)
-					return false
-				}
-				req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36")
-				resp, err := httpClient.Do(req)
+				resp, err := muGet(muUrl)
 
 				// Sleep if we get a warning, otherwise we don't retry again!
 				if err == nil && resp.StatusCode == 429 {
