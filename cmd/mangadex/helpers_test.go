@@ -18,26 +18,35 @@ func init() {
 	}
 }
 
-func setupTestDB() *sql.DB {
+func setupTestDB(tb testing.TB) *sql.DB {
+	tb.Helper()
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
+
+	oldDB := internal.DB
+	internal.DB = db
+	tb.Cleanup(func() {
+		_ = db.Close()
+		internal.DB = oldDB
+	})
+
 	_, err = db.Exec("CREATE TABLE " + internal.TableManga + " (UUID TEXT PRIMARY KEY, JSON TEXT, DATE TEXT)")
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 
 	stmt, err := db.Prepare("INSERT INTO " + internal.TableManga + " (UUID, JSON, DATE) VALUES (?, ?, ?)")
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	defer stmt.Close()
 
 	for _, uuid := range testUUIDs {
 		_, err = stmt.Exec(uuid, "{}", "2023-01-01")
 		if err != nil {
-			panic(err)
+			tb.Fatal(err)
 		}
 	}
 
@@ -45,9 +54,7 @@ func setupTestDB() *sql.DB {
 }
 
 func BenchmarkExistsInDatabase(b *testing.B) {
-	db := setupTestDB()
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -56,9 +63,7 @@ func BenchmarkExistsInDatabase(b *testing.B) {
 }
 
 func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
-	db := setupTestDB()
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(b)
 
 	batchSize := 100
 	b.ResetTimer()
@@ -73,9 +78,7 @@ func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
 }
 
 func TestExistsInDatabase(t *testing.T) {
-	db := setupTestDB()
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(t)
 
 	// Test existing
 	if !ExistsInDatabase("uuid-1") {
@@ -89,9 +92,7 @@ func TestExistsInDatabase(t *testing.T) {
 }
 
 func TestGetExistingMangaUUIDs(t *testing.T) {
-	db := setupTestDB()
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(t)
 
 	uuids := []string{"uuid-1", "uuid-2", "uuid-9999"}
 	existing := GetExistingMangaUUIDs(uuids)
@@ -111,9 +112,7 @@ func TestGetExistingMangaUUIDs(t *testing.T) {
 }
 
 func TestGetExistingMangaUUIDs_Chunking(t *testing.T) {
-	db := setupTestDB()
-	defer db.Close()
-	internal.DB = db
+	setupTestDB(t)
 
 	// setupTestDB adds 1000 UUIDs (uuid-0 to uuid-999)
 	// We pass 1100 UUIDs to test chunking (chunk size is 900)
