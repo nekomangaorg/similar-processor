@@ -8,6 +8,7 @@ import (
 	"go.uber.org/ratelimit"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -47,7 +48,7 @@ func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rat
 
 		// Try the new id!
 		rateLimiter.Take()
-		resp2, err := httpClient.Get("https://api.mangaupdates.com/v1/series/" + base10Id)
+		resp2, err := httpClient.Get("https://api.mangaupdates.com/v1/series/" + url.PathEscape(base10Id))
 		if err != nil {
 			fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to get new id %s: %v\u001B[0m\n", uuid, base10Id, err)
 			return false
@@ -83,7 +84,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 		rateLimiter.Take()
 		// Try the existing as the id (not likely since mangadex won't have updated..)
-		resp1, err1 := httpClient.Get("https://api.mangaupdates.com/v1/series/" + convertedId)
+		resp1, err1 := httpClient.Get("https://api.mangaupdates.com/v1/series/" + url.PathEscape(convertedId))
 
 		if err1 == nil && resp1.StatusCode == 200 {
 			drainAndClose(resp1)
@@ -106,10 +107,10 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 				// If invalid, then try to get the page and parse it!
 				// Query and get our html... (no api to get this...)
-				url := "https://www.mangaupdates.com/series.html?id=" + convertedId
-				req, err := http.NewRequest("GET", url, nil)
+				muUrl := "https://www.mangaupdates.com/series.html?id=" + url.QueryEscape(convertedId)
+				req, err := http.NewRequest("GET", muUrl, nil)
 				if err != nil {
-					fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to create request for %s: %v\u001B[0m\n", uuid, url, err)
+					fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to create request for %s: %v\u001B[0m\n", uuid, muUrl, err)
 					return false
 				}
 				req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36")
@@ -131,7 +132,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 						return false
 					} else {
-						fmt.Printf("\u001B[1;31m %s EXTERNAL MU %s: http code %d (try %d of %d)\u001B[0m\n", uuid, url, resp.StatusCode, counter, counterMax)
+						fmt.Printf("\u001B[1;31m %s EXTERNAL MU %s: http code %d (try %d of %d)\u001B[0m\n", uuid, muUrl, resp.StatusCode, counter, counterMax)
 
 						drainAndClose(resp)
 
@@ -145,7 +146,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 					drainAndClose(resp)
 
 					if err != nil {
-						fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to parse HTML for %s: %v\u001B[0m\n", uuid, url, err)
+						fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to parse HTML for %s: %v\u001B[0m\n", uuid, muUrl, err)
 						continue
 					}
 
@@ -159,7 +160,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 					}
 				} else {
 					if err != nil {
-						fmt.Printf("\u001B[1;31m %s EXTERNAL MU: request failed for %s (try %d of %d): %v\u001B[0m\n", uuid, url, counter, counterMax, err)
+						fmt.Printf("\u001B[1;31m %s EXTERNAL MU: request failed for %s (try %d of %d): %v\u001B[0m\n", uuid, muUrl, counter, counterMax, err)
 					}
 					// Catch all case to ensure body is closed
 					if resp != nil {
