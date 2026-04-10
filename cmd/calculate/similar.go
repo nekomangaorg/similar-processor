@@ -67,6 +67,8 @@ func runSimilar(cmd *cobra.Command, args []string) {
 	threads, _ := cmd.Flags().GetInt("threads")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
+	defer CloseDebugFiles()
+
 	if !exportOnly {
 		fmt.Printf("\nBegin calculating similars\n")
 		calculateSimilars(debugMode, skippedMode, threads, verbose)
@@ -457,12 +459,12 @@ func processManga(idx int, data *SimilarityData, config processingConfig, progre
 			dDesc = 0
 		}
 
-        if dDesc < IgnoreDescScoreUnder || data.CorpusDescLength[i] < MinDescriptionWords {
-            dDesc = 0
-        }
-        if len(data.MangaList[i].Tags) < IgnoreTagsUnderCount || dDesc > AcceptDescScoreOver {
-            dTag = 1
-        }
+		if dDesc < IgnoreDescScoreUnder || data.CorpusDescLength[i] < MinDescriptionWords {
+			dDesc = 0
+		}
+		if len(data.MangaList[i].Tags) < IgnoreTagsUnderCount || dDesc > AcceptDescScoreOver {
+			dTag = 1
+		}
 
 		score := TagScoreRatio*dTag + dDesc
 		if score <= 0 {

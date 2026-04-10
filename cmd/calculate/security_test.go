@@ -13,7 +13,9 @@ func TestWriteLineToDebugFilePermissions(t *testing.T) {
 	fileName := "test_security_debug"
 	line := "test line"
 
-	WriteLineToDebugFile(fileName, line)
+	if err := WriteLineToDebugFile(fileName, line); err != nil {
+		t.Fatalf("Failed to write to debug file: %v", err)
+	}
 
 	// Check directory permissions
 	info, err := os.Stat("debug")

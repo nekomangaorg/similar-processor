@@ -164,6 +164,7 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 	}
 
 	wg.Wait()
+	CloseDebugFiles()
 
 	fmt.Println("Exporting MangaUpdates New Ids file")
 	exportMapping(internal.TableMangaupdatesNewId, "mangaupdates_new2mdex")
