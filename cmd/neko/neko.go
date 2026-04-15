@@ -29,7 +29,7 @@ var mappingTables = []string{
 	internal.TableMangaupdates,
 	internal.TableMangaupdatesNewId,
 	internal.TableNovelUpdates,
-	internal.TableMangaBaka,
+	"MANGABAKA",
 }
 
 func init() {
@@ -43,8 +43,13 @@ func runNeko(command *cobra.Command, args []string) {
 	fmt.Println("Starting neko export")
 
 	mappings := make(map[string]map[string]string)
+
+	// DIAGNOSTIC 1: Check how many mappings actually load from SQLite into memory
 	for _, table := range mappingTables {
 		mappings[table] = getAllMappings(table)
+		if table == "MANGABAKA" {
+			fmt.Printf(">> DEBUG: Loaded %d total MangaBaka entries from local database.\n", len(mappings[table]))
+		}
 	}
 
 	tx, err := nekoDb.Begin()
@@ -62,6 +67,8 @@ func processMangaList(tx *sql.Tx, mangaList iter.Seq[internal.Manga], mappings m
 	internal.CheckErr(err)
 	defer stmt.Close()
 
+	matchCount := 0
+
 	for manga := range mangaList {
 		nekoEntry := internal.DbNeko{}
 		nekoEntry.UUID = manga.Id
@@ -69,11 +76,18 @@ func processMangaList(tx *sql.Tx, mangaList iter.Seq[internal.Manga], mappings m
 		for table, mapping := range mappings {
 			if val, ok := mapping[manga.Id]; ok {
 				setNekoField(&nekoEntry, table, val)
+
+				// DIAGNOSTIC 2: Count how many UUIDs perfectly match between MangaBaka and the MangaDex JSON
+				if table == "MANGABAKA" {
+					matchCount++
+				}
 			}
 		}
 
 		insertNekoEntry(stmt, nekoEntry)
 	}
+
+	fmt.Printf(">> DEBUG: Successfully matched and assigned the 'mb' field to %d MangaDex entries.\n", matchCount)
 }
 
 func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
@@ -94,7 +108,7 @@ func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
 		nekoEntry.MANGAUPDATES_NEW = value
 	case internal.TableNovelUpdates:
 		nekoEntry.NOVEL_UPDATES = value
-	case internal.TableMangaBaka:
+	case "MANGABAKA":
 		nekoEntry.MANGABAKA = value
 	default:
 		fmt.Fprintf(os.Stderr, "Warning: unhandled table in setNekoField: %s\n", table)

@@ -183,9 +183,8 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 }
 
 func syncMangaBakaFromSeries() {
-	fmt.Println("\nSyncing missing MangaBaka entries from series table...")
+	fmt.Println("\nSyncing missing MangaBaka entries from remote SQLite API...")
 
-	// 1. Load mappings from data.db (using internal.DB) into memory maps
 	fmt.Println("Loading mapping tables into memory...")
 	anilistMap := loadMappingIntoMap("ANILIST")
 	malMap := loadMappingIntoMap("MYANIMELIST")
@@ -195,7 +194,7 @@ func syncMangaBakaFromSeries() {
 	muNewMap := loadMappingIntoMap("MANGAUPDATES_NEW")
 	mangaBakaMap := loadMappingIntoMap("MANGABAKA")
 
-	downloadUrl := "https://api.mangabaka.dev/v1/database/series.sqlite.tar.gz" // Update extension if it's strictly .tar.gz
+	downloadUrl := "https://api.mangabaka.dev/v1/database/series.sqlite.tar.gz"
 	fmt.Printf("Downloading and extracting %s...\n", downloadUrl)
 	resp, err := http.Get(downloadUrl)
 	internal.CheckErr(err)
@@ -214,7 +213,6 @@ func syncMangaBakaFromSeries() {
 	tempDbPath := "data/temp_remote_series.sqlite"
 	foundDb := false
 
-	// 3. Find the sqlite file in the tar archive and write it to a temporary file
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -222,7 +220,6 @@ func syncMangaBakaFromSeries() {
 		}
 		internal.CheckErr(err)
 
-		// Look for the sqlite file
 		if strings.HasSuffix(header.Name, ".sqlite") || strings.HasSuffix(header.Name, ".db") {
 			fmt.Printf("Found %s in archive, writing to temporary file...\n", header.Name)
 
@@ -234,7 +231,7 @@ func syncMangaBakaFromSeries() {
 			internal.CheckErr(err)
 
 			foundDb = true
-			break // We got the file, stop reading the tar
+			break
 		}
 	}
 
@@ -243,10 +240,8 @@ func syncMangaBakaFromSeries() {
 		return
 	}
 
-	// Make sure we delete the temporary downloaded database when the function finishes
 	defer os.Remove(tempDbPath)
 
-	// 4. Connect to the newly extracted temporary SQLite database
 	fmt.Println("Connecting to remote database and processing series...")
 	remoteDB, err := sql.Open("sqlite3", tempDbPath)
 	internal.CheckErr(err)
@@ -259,7 +254,6 @@ func syncMangaBakaFromSeries() {
 	internal.CheckErr(err)
 	defer rows.Close()
 
-	// Start a transaction on data.db to save our new MangaBaka entries
 	tx, err := internal.DB.Begin()
 	internal.CheckErr(err)
 	defer tx.Rollback()
@@ -267,50 +261,86 @@ func syncMangaBakaFromSeries() {
 	newEntriesCount := 0
 	processedCount := 0
 
+	// NEW: Audit trackers
+	noExternalIdCount := 0
+	noBridgeFoundCount := 0
+	sqlErrorCount := 0
+
+	// Helper to safely extract and trim whitespace from pointers
+	formatID := func(id *string) string {
+		if id == nil {
+			return ""
+		}
+		return strings.TrimSpace(*id)
+	}
+
 	for rows.Next() {
 		var id int
 		var alID, malID, ktID, apID, muID *string
+
 		err := rows.Scan(&id, &alID, &malID, &ktID, &apID, &muID)
 		internal.CheckErr(err)
 
 		processedCount++
 		if processedCount%50000 == 0 {
-			fmt.Printf("Processed %d / 540000 series...\n", processedCount)
+			fmt.Printf("Processed %d series...\n", processedCount)
 		}
 
-		// 4. Look up UUIDs instantly using our memory maps
+		al := formatID(alID)
+		mal := formatID(malID)
+		kt := formatID(ktID)
+		ap := formatID(apID)
+		mu := formatID(muID)
+
 		var mdexUUID string
 
-		if alID != nil && anilistMap[*alID] != "" {
-			mdexUUID = anilistMap[*alID]
-		} else if malID != nil && malMap[*malID] != "" {
-			mdexUUID = malMap[*malID]
-		} else if ktID != nil && kitsuMap[*ktID] != "" {
-			mdexUUID = kitsuMap[*ktID]
-		} else if apID != nil && animePlanetMap[*apID] != "" {
-			mdexUUID = animePlanetMap[*apID]
-		} else if muID != nil && muNewMap[*muID] != "" {
-			mdexUUID = muNewMap[*muID]
-		} else if muID != nil && muOldMap[*muID] != "" {
-			mdexUUID = muOldMap[*muID]
+		if al != "" && anilistMap[al] != "" {
+			mdexUUID = anilistMap[al]
+		} else if mal != "" && malMap[mal] != "" {
+			mdexUUID = malMap[mal]
+		} else if kt != "" && kitsuMap[kt] != "" {
+			mdexUUID = kitsuMap[kt]
+		} else if ap != "" && animePlanetMap[ap] != "" {
+			mdexUUID = animePlanetMap[ap]
+		} else if mu != "" && muNewMap[mu] != "" {
+			mdexUUID = muNewMap[mu]
+		} else if mu != "" && muOldMap[mu] != "" {
+			mdexUUID = muOldMap[mu]
 		}
 
 		if mdexUUID != "" {
 			strId := fmt.Sprintf("%d", id)
 
-			// If it's not already in MangaBaka DB, add it directly to SQLite!
 			if mangaBakaMap[strId] == "" {
-				_, err := tx.Exec("INSERT INTO MANGABAKA(UUID, ID) VALUES (?, ?)", mdexUUID, id)
+				// NEW: Re-added ON CONFLICT DO UPDATE so duplicate UUIDs don't crash the insert silently
+				_, err := tx.Exec("INSERT INTO MANGABAKA(UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", mdexUUID, id)
 				if err == nil {
 					mangaBakaMap[strId] = mdexUUID
 					newEntriesCount++
+				} else {
+					sqlErrorCount++
+					fmt.Printf(">> SQL Error on ID %d: %v\n", id, err)
 				}
+			}
+		} else {
+			// If we didn't find a UUID, figure out why for the audit
+			if al == "" && mal == "" && kt == "" && ap == "" && mu == "" {
+				noExternalIdCount++
+			} else {
+				noBridgeFoundCount++
 			}
 		}
 	}
 
 	internal.CheckErr(tx.Commit())
-	fmt.Printf("Remote sync complete. Processed %d series. Added %d new entries to MangaBaka DB.\n", processedCount, newEntriesCount)
+
+	fmt.Printf("\n--- MangaBaka Sync Audit ---\n")
+	fmt.Printf("Total Series Processed: %d\n", processedCount)
+	fmt.Printf("New Entries Added: %d\n", newEntriesCount)
+	fmt.Printf("Skipped (No External IDs in MangaBaka): %d\n", noExternalIdCount)
+	fmt.Printf("Skipped (External IDs found, but no match in local MangaDex maps): %d\n", noBridgeFoundCount)
+	fmt.Printf("Failed (SQL Errors): %d\n", sqlErrorCount)
+	fmt.Println("----------------------------\n")
 }
 
 func loadMappingIntoMap(tableName string) map[string]string {
