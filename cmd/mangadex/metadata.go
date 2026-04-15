@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/antihax/optional"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/similar-manga/similar/internal"
 	"github.com/similar-manga/similar/mangadex"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"
-	"os"
-	"strings"
-	"time"
 )
 
 var metadataCmd = &cobra.Command{
@@ -72,7 +73,7 @@ func runMetadata(cmd *cobra.Command, args []string) {
 		BatchUpsertManga(mangaList.Data)
 
 	} else {
-		rateLimiter := ratelimit.New(1, ratelimit.Per(2*time.Second))
+		rateLimiter := ratelimit.New(1, ratelimit.Per(1*time.Second))
 
 		readFile, err := os.Open("data/last_metadata_update.txt")
 		internal.CheckErr(err)
