@@ -14,4 +14,5 @@ type DbNeko struct {
 	NOVEL_UPDATES    string
 	KITSU            string
 	MYANIMELIST      string
+	MANGABAKA        string
 }

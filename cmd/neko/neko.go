@@ -3,13 +3,14 @@ package neko
 import (
 	"database/sql"
 	"fmt"
-	"github.com/similar-manga/similar/cmd"
-	"github.com/similar-manga/similar/internal"
-	"github.com/spf13/cobra"
 	"io"
 	"iter"
 	"os"
 	"time"
+
+	"github.com/similar-manga/similar/cmd"
+	"github.com/similar-manga/similar/internal"
+	"github.com/spf13/cobra"
 )
 
 var nekoCmd = &cobra.Command{
@@ -28,6 +29,7 @@ var mappingTables = []string{
 	internal.TableMangaupdates,
 	internal.TableMangaupdatesNewId,
 	internal.TableNovelUpdates,
+	internal.TableMangaBaka,
 }
 
 func init() {
@@ -56,7 +58,7 @@ func runNeko(command *cobra.Command, args []string) {
 }
 
 func processMangaList(tx *sql.Tx, mangaList iter.Seq[internal.Manga], mappings map[string]map[string]string) {
-	stmt, err := tx.Prepare("INSERT INTO " + internal.TableNekoMappings + " (mdex, al, ap, bw, mu, mu_new, nu, kt , mal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmt, err := tx.Prepare("INSERT INTO " + internal.TableNekoMappings + " (mdex, al, ap, bw, mu, mu_new, nu, kt , mal, mb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	internal.CheckErr(err)
 	defer stmt.Close()
 
@@ -92,6 +94,8 @@ func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
 		nekoEntry.MANGAUPDATES_NEW = value
 	case internal.TableNovelUpdates:
 		nekoEntry.NOVEL_UPDATES = value
+	case internal.TableMangaBaka:
+		nekoEntry.MANGABAKA = value
 	default:
 		fmt.Fprintf(os.Stderr, "Warning: unhandled table in setNekoField: %s\n", table)
 	}
@@ -148,7 +152,7 @@ func createNekoMappingDB() *sql.DB {
 }
 
 func insertNekoEntry(stmt *sql.Stmt, nekoEntry internal.DbNeko) {
-	_, err := stmt.Exec(nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST)
+	_, err := stmt.Exec(nekoEntry.UUID, nekoEntry.ANILIST, nekoEntry.ANIMEPLANET, nekoEntry.BOOKWALKER, nekoEntry.MANGAUPDATES, nekoEntry.MANGAUPDATES_NEW, nekoEntry.NOVEL_UPDATES, nekoEntry.KITSU, nekoEntry.MYANIMELIST, nekoEntry.MANGABAKA)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to insert neko entry for manga %s: %v\n", nekoEntry.UUID, err)
 		fmt.Fprintln(os.Stderr, "Continuing after error.")

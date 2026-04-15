@@ -3,14 +3,15 @@ package calculate
 import (
 	"bufio"
 	"fmt"
-	"github.com/similar-manga/similar/cmd"
-	"github.com/similar-manga/similar/internal"
-	"github.com/spf13/cobra"
 	"io"
 	"log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/similar-manga/similar/cmd"
+	"github.com/similar-manga/similar/internal"
+	"github.com/spf13/cobra"
 )
 
 var initCmd = &cobra.Command{

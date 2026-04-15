@@ -17,6 +17,7 @@ const TableNovelUpdates = "NOVEL_UPDATES"
 const TableKitsu = "KITSU"
 const TableBookWalker = "BOOK_WALKER"
 const TableAnimePlanet = "ANIME_PLANET"
+const TableMangaBaka = "MANGABAKA"
 
 const TableNekoMappings = "mappings"
 

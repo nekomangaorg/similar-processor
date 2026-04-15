@@ -1,13 +1,21 @@
 package calculate
 
 import (
+	"archive/tar"
+	"compress/gzip"
+	"database/sql"
 	"fmt"
+	"io"
+	"iter"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/similar-manga/similar/internal"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"
-	"iter"
-	"sync"
-	"time"
 )
 
 var mappingsCmd = &cobra.Command{
@@ -107,6 +115,8 @@ func runMappings(cmd *cobra.Command, args []string) {
 	internal.CheckErr(err)
 	calculateMangaUpdatesNewIdMapping(internal.StreamAllManga(), totalManga)
 
+	syncMangaBakaFromSeries()
+
 	fmt.Printf("Finished all mappings in %s\n", time.Since(initialStart))
 
 }
@@ -170,4 +180,155 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 	exportMapping(internal.TableMangaupdatesNewId, "mangaupdates_new2mdex")
 
 	fmt.Printf("done processing MangaUpdates New Ids (%.2f seconds)!\n", time.Since(start).Seconds())
+}
+
+func syncMangaBakaFromSeries() {
+	fmt.Println("\nSyncing missing MangaBaka entries from series table...")
+
+	// 1. Load mappings from data.db (using internal.DB) into memory maps
+	fmt.Println("Loading mapping tables into memory...")
+	anilistMap := loadMappingIntoMap("ANILIST")
+	malMap := loadMappingIntoMap("MYANIMELIST")
+	kitsuMap := loadMappingIntoMap("KITSU")
+	animePlanetMap := loadMappingIntoMap("ANIME_PLANET")
+	muOldMap := loadMappingIntoMap("MANGAUPDATES_OLD")
+	muNewMap := loadMappingIntoMap("MANGAUPDATES_NEW")
+	mangaBakaMap := loadMappingIntoMap("MANGABAKA")
+
+	downloadUrl := "https://api.mangabaka.dev/v1/database/series.sqlite.tar.gz" // Update extension if it's strictly .tar.gz
+	fmt.Printf("Downloading and extracting %s...\n", downloadUrl)
+	resp, err := http.Get(downloadUrl)
+	internal.CheckErr(err)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Error: Received HTTP %d from MangaBaka API\n", resp.StatusCode)
+		return
+	}
+
+	gzReader, err := gzip.NewReader(resp.Body)
+	internal.CheckErr(err)
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+	tempDbPath := "data/temp_remote_series.sqlite"
+	foundDb := false
+
+	// 3. Find the sqlite file in the tar archive and write it to a temporary file
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		internal.CheckErr(err)
+
+		// Look for the sqlite file
+		if strings.HasSuffix(header.Name, ".sqlite") || strings.HasSuffix(header.Name, ".db") {
+			fmt.Printf("Found %s in archive, writing to temporary file...\n", header.Name)
+
+			outFile, err := os.Create(tempDbPath)
+			internal.CheckErr(err)
+
+			_, err = io.Copy(outFile, tarReader)
+			outFile.Close()
+			internal.CheckErr(err)
+
+			foundDb = true
+			break // We got the file, stop reading the tar
+		}
+	}
+
+	if !foundDb {
+		fmt.Println("Error: Could not find a .sqlite file inside the tar archive.")
+		return
+	}
+
+	// Make sure we delete the temporary downloaded database when the function finishes
+	defer os.Remove(tempDbPath)
+
+	// 4. Connect to the newly extracted temporary SQLite database
+	fmt.Println("Connecting to remote database and processing series...")
+	remoteDB, err := sql.Open("sqlite3", tempDbPath)
+	internal.CheckErr(err)
+	defer remoteDB.Close()
+
+	rows, err := remoteDB.Query(`
+		SELECT id, source_anilist_id, source_my_anime_list_id, source_kitsu_id, source_anime_planet_id, source_manga_updates_id 
+		FROM series 
+		WHERE merged_with IS NULL`)
+	internal.CheckErr(err)
+	defer rows.Close()
+
+	// Start a transaction on data.db to save our new MangaBaka entries
+	tx, err := internal.DB.Begin()
+	internal.CheckErr(err)
+	defer tx.Rollback()
+
+	newEntriesCount := 0
+	processedCount := 0
+
+	for rows.Next() {
+		var id int
+		var alID, malID, ktID, apID, muID *string
+		err := rows.Scan(&id, &alID, &malID, &ktID, &apID, &muID)
+		internal.CheckErr(err)
+
+		processedCount++
+		if processedCount%50000 == 0 {
+			fmt.Printf("Processed %d / 540000 series...\n", processedCount)
+		}
+
+		// 4. Look up UUIDs instantly using our memory maps
+		var mdexUUID string
+
+		if alID != nil && anilistMap[*alID] != "" {
+			mdexUUID = anilistMap[*alID]
+		} else if malID != nil && malMap[*malID] != "" {
+			mdexUUID = malMap[*malID]
+		} else if ktID != nil && kitsuMap[*ktID] != "" {
+			mdexUUID = kitsuMap[*ktID]
+		} else if apID != nil && animePlanetMap[*apID] != "" {
+			mdexUUID = animePlanetMap[*apID]
+		} else if muID != nil && muNewMap[*muID] != "" {
+			mdexUUID = muNewMap[*muID]
+		} else if muID != nil && muOldMap[*muID] != "" {
+			mdexUUID = muOldMap[*muID]
+		}
+
+		if mdexUUID != "" {
+			strId := fmt.Sprintf("%d", id)
+
+			// If it's not already in MangaBaka DB, add it directly to SQLite!
+			if mangaBakaMap[strId] == "" {
+				_, err := tx.Exec("INSERT INTO MANGABAKA(UUID, ID) VALUES (?, ?)", mdexUUID, id)
+				if err == nil {
+					mangaBakaMap[strId] = mdexUUID
+					newEntriesCount++
+				}
+			}
+		}
+	}
+
+	internal.CheckErr(tx.Commit())
+	fmt.Printf("Remote sync complete. Processed %d series. Added %d new entries to MangaBaka DB.\n", processedCount, newEntriesCount)
+}
+
+func loadMappingIntoMap(tableName string) map[string]string {
+	m := make(map[string]string)
+
+	query := fmt.Sprintf("SELECT ID, UUID FROM %s", tableName)
+	rows, err := internal.DB.Query(query)
+
+	if err != nil {
+		return m
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id, uuid string
+		if err := rows.Scan(&id, &uuid); err == nil {
+			m[id] = uuid
+		}
+	}
+	return m
 }
