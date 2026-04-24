@@ -116,41 +116,23 @@ func GetExistingMangaUUIDs(uuids []string) map[string]bool {
 	}
 
 	existing := make(map[string]bool)
-	const chunkSize = 900 // SQLite's default parameter limit is 999, using a safe margin.
 
-	for i := 0; i < len(uuids); i += chunkSize {
-		end := i + chunkSize
-		if end > len(uuids) {
-			end = len(uuids)
-		}
-		chunk := uuids[i:end]
+	jsonUUIDs, err := json.Marshal(uuids)
+	internal.CheckErr(err)
 
-		if len(chunk) == 0 {
-			continue
-		}
+	query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (SELECT value FROM json_each(?))", internal.TableManga)
+	rows, err := internal.DB.Query(query, string(jsonUUIDs))
+	internal.CheckErr(err)
+	defer rows.Close()
 
-		placeholders := make([]string, len(chunk))
-		args := make([]any, len(chunk))
-		for j, uuid := range chunk {
-			placeholders[j] = "?"
-			args[j] = uuid
-		}
-
-		query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (%s)", internal.TableManga, strings.Join(placeholders, ","))
-		rows, err := internal.DB.Query(query, args...)
+	for rows.Next() {
+		var uuid string
+		err := rows.Scan(&uuid)
 		internal.CheckErr(err)
-
-		func() {
-			defer rows.Close()
-			for rows.Next() {
-				var uuid string
-				err := rows.Scan(&uuid)
-				internal.CheckErr(err)
-				existing[uuid] = true
-			}
-			internal.CheckErr(rows.Err())
-		}()
+		existing[uuid] = true
 	}
+	internal.CheckErr(rows.Err())
+
 	return existing
 }
 
