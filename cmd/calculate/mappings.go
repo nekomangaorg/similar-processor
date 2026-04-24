@@ -340,7 +340,7 @@ func syncMangaBakaFromSeries() {
 	fmt.Printf("Skipped (No External IDs in MangaBaka): %d\n", noExternalIdCount)
 	fmt.Printf("Skipped (External IDs found, but no match in local MangaDex maps): %d\n", noBridgeFoundCount)
 	fmt.Printf("Failed (SQL Errors): %d\n", sqlErrorCount)
-	fmt.Println("----------------------------\n")
+	fmt.Println("----------------------------")
 }
 
 func loadMappingIntoMap(tableName string) map[string]string {
