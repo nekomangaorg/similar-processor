@@ -141,19 +141,36 @@ func CloseDebugFiles() {
 func exportMapping(tableName string, fileName string) {
 	genericList, err := getAllGenericFromTable(tableName)
 	internal.CheckErr(err)
-	exportGeneric(fileName, genericList)
-}
-
-func exportGeneric(fileName string, genericList []internal.DbGeneric) {
-	file, err := os.Create("data/mappings/" + fileName + ".txt")
+	err = exportGeneric(fileName, genericList)
 	internal.CheckErr(err)
-	for _, entry := range genericList {
-		file.WriteString(entry.ID + ":::||@!@||:::" + entry.UUID + "\n")
-	}
-	file.Close()
 }
 
-func getAllGenericFromTable(tableName string) ([]internal.DbGeneric, error) {
+func exportGeneric(fileName string, genericList iter.Seq[internal.DbGeneric]) error {
+	file, err := os.Create("data/mappings/" + fileName + ".txt")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	writer := bufio.NewWriter(file)
+	defer writer.Flush()
+	for entry := range genericList {
+		if _, err := writer.WriteString(entry.ID); err != nil {
+			return err
+		}
+		if _, err := writer.WriteString(":::||@!@||:::"); err != nil {
+			return err
+		}
+		if _, err := writer.WriteString(entry.UUID); err != nil {
+			return err
+		}
+		if err := writer.WriteByte('\n'); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getAllGenericFromTable(tableName string) (iter.Seq[internal.DbGeneric], error) {
 	switch tableName {
 	case internal.TableAnilist, internal.TableAnimePlanet, internal.TableBookWalker, internal.TableKitsu, internal.TableMyanimelist, internal.TableMangaupdates, internal.TableMangaupdatesNewId, internal.TableNovelUpdates:
 		// OK
@@ -165,21 +182,25 @@ func getAllGenericFromTable(tableName string) ([]internal.DbGeneric, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var genericList []internal.DbGeneric
-	for rows.Next() {
-		generic := internal.DbGeneric{}
-		err = rows.Scan(&generic.UUID, &generic.ID)
-		if err != nil {
-			return nil, err
+	return func(yield func(internal.DbGeneric) bool) {
+		defer rows.Close()
+
+		for rows.Next() {
+			generic := internal.DbGeneric{}
+			err = rows.Scan(&generic.UUID, &generic.ID)
+			if err != nil {
+				log.Printf("ERROR: failed to scan generic row: %v", err)
+				continue
+			}
+			if !yield(generic) {
+				return
+			}
 		}
-		genericList = append(genericList, generic)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return genericList, nil
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: error iterating generic rows: %v", err)
+		}
+	}, nil
 }
 
 func CreateMappingsFile(fileName string) *os.File {
