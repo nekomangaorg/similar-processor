@@ -46,18 +46,25 @@ var (
 
 func init() {
 	calculateCmd.AddCommand(similarCmd)
-	similarCmd.Flags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
-	similarCmd.Flags().BoolP("debug", "d", false, "Run a set of debug entries only.")
-	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
-	similarCmd.Flags().IntP("threads", "t", 1000, "Change the batch processing amount")
-	similarCmd.Flags().BoolP("verbose", "v", false, "Print detailed match information")
+	initSimilarFlags()
+	initStopWords()
+}
 
+func initStopWords() {
 	// Pre-process stop words once
 	cachedStopWords = append([]string(nil), similar.StopWords...)
 	stemmer.StemMultipleMutate(&cachedStopWords)
 	for i := range cachedStopWords {
 		cachedStopWords[i] = strings.ToLower(cachedStopWords[i])
 	}
+}
+
+func initSimilarFlags() {
+	similarCmd.Flags().BoolP("skipped", "s", false, "Print out reason a match was skipped")
+	similarCmd.Flags().BoolP("debug", "d", false, "Run a set of debug entries only.")
+	similarCmd.Flags().BoolP("export", "e", false, "Only export results, don't recalculate similar.")
+	similarCmd.Flags().IntP("threads", "t", 1000, "Change the batch processing amount")
+	similarCmd.Flags().BoolP("verbose", "v", false, "Print detailed match information")
 }
 
 func runSimilar(cmd *cobra.Command, args []string) {
