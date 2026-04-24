@@ -94,7 +94,10 @@ func calculateSimilars(debugMode bool, skippedMode bool, threads int, verbose bo
 	allManga := internal.StreamAllManga()
 
 	if !debugMode {
-		DeleteSimilarDB()
+		if err := DeleteSimilarDB(); err != nil {
+			fmt.Printf("Failed to clear SIMILAR table: %v\n", err)
+			return
+		}
 	}
 
 	data, err := prepareSimilarityData(allManga)

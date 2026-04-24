@@ -78,3 +78,54 @@ func TestGetAllGenericFromTable_InvalidTable(t *testing.T) {
 		t.Errorf("expected error %q, got %q", expectedError, err.Error())
 	}
 }
+
+func TestDeleteSimilarDB(t *testing.T) {
+	db, teardown := setupTestDB(t)
+	defer teardown()
+
+	// Create SIMILAR table
+	_, err := db.Exec("CREATE TABLE " + internal.TableSimilar + " (UUID TEXT PRIMARY KEY, JSON TEXT)")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert multiple test data rows
+	testRows := []struct {
+		uuid string
+		json string
+	}{
+		{"uuid1", "{}"},
+		{"uuid2", "{}"},
+		{"uuid3", "{}"},
+	}
+	for _, row := range testRows {
+		_, err = db.Exec("INSERT INTO "+internal.TableSimilar+" (UUID, JSON) VALUES (?, ?)", row.uuid, row.json)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Verify all data is there
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM " + internal.TableSimilar).Scan(&count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != len(testRows) {
+		t.Fatalf("expected %d rows, got %d", len(testRows), count)
+	}
+
+	// Call DeleteSimilarDB
+	if err := DeleteSimilarDB(); err != nil {
+		t.Fatalf("DeleteSimilarDB returned an unexpected error: %v", err)
+	}
+
+	// Assert table is empty
+	err = db.QueryRow("SELECT COUNT(*) FROM " + internal.TableSimilar).Scan(&count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 rows after delete, got %d", count)
+	}
+}
