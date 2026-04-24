@@ -57,9 +57,14 @@ func TestGetAllGenericFromTable(t *testing.T) {
 	}
 
 	// Test happy path
-	result, err := getAllGenericFromTable(internal.TableAnilist)
+	resultSeq, err := getAllGenericFromTable(internal.TableAnilist)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result []internal.DbGeneric
+	for generic := range resultSeq {
+		result = append(result, generic)
 	}
 
 	if !reflect.DeepEqual(result, testData) {

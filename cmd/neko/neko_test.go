@@ -18,7 +18,7 @@ func TestProcessMangaList(t *testing.T) {
 	defer outputDB.Close()
 
 	// Create 'mappings' table
-	_, err = outputDB.Exec("CREATE TABLE " + internal.TableNekoMappings + " (mdex TEXT, al TEXT, ap TEXT, bw TEXT, mu TEXT, mu_new TEXT, nu TEXT, kt TEXT, mal TEXT)")
+	_, err = outputDB.Exec("CREATE TABLE " + internal.TableNekoMappings + " (mdex TEXT, al TEXT, ap TEXT, bw TEXT, mu TEXT, mu_new TEXT, nu TEXT, kt TEXT, mal TEXT, mb TEXT)")
 	if err != nil {
 		t.Fatalf("Failed to create mappings table: %v", err)
 	}
