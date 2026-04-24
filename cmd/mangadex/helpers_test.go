@@ -1,8 +1,8 @@
 package mangadex
 
 import (
-	"encoding/json"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"testing"
 
