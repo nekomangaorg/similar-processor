@@ -13,9 +13,9 @@ import (
 	"sync"
 )
 
-func DeleteSimilarDB() {
+func DeleteSimilarDB() error {
 	_, err := internal.DB.Exec("DELETE FROM " + internal.TableSimilar)
-	internal.CheckErr(err)
+	return err
 }
 
 var (

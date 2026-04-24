@@ -89,24 +89,36 @@ func TestDeleteSimilarDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Insert test data
-	_, err = db.Exec("INSERT INTO " + internal.TableSimilar + " (UUID, JSON) VALUES (?, ?)", "uuid1", "{}")
-	if err != nil {
-		t.Fatal(err)
+	// Insert multiple test data rows
+	testRows := []struct {
+		uuid string
+		json string
+	}{
+		{"uuid1", "{}"},
+		{"uuid2", "{}"},
+		{"uuid3", "{}"},
+	}
+	for _, row := range testRows {
+		_, err = db.Exec("INSERT INTO "+internal.TableSimilar+" (UUID, JSON) VALUES (?, ?)", row.uuid, row.json)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	// Verify data is there
+	// Verify all data is there
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM " + internal.TableSimilar).Scan(&count)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Fatalf("expected 1 row, got %d", count)
+	if count != len(testRows) {
+		t.Fatalf("expected %d rows, got %d", len(testRows), count)
 	}
 
 	// Call DeleteSimilarDB
-	DeleteSimilarDB()
+	if err := DeleteSimilarDB(); err != nil {
+		t.Fatalf("DeleteSimilarDB returned an unexpected error: %v", err)
+	}
 
 	// Assert table is empty
 	err = db.QueryRow("SELECT COUNT(*) FROM " + internal.TableSimilar).Scan(&count)
