@@ -49,7 +49,8 @@ func runAdd(cmd *cobra.Command, args []string) {
 			uuids[i] = apiManga.Id
 		}
 
-		existingUUIDs := GetExistingMangaUUIDs(uuids)
+		existingUUIDs, err := GetExistingMangaUUIDs(uuids)
+		internal.CheckErr(err)
 
 		var toUpsert []mangadex.Manga
 		for _, apiManga := range mangaList.Data {

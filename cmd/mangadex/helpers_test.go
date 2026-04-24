@@ -75,7 +75,7 @@ func BenchmarkGetExistingMangaUUIDs(b *testing.B) {
 		if end > 1000 {
 			end = 1000
 		}
-		GetExistingMangaUUIDs(testUUIDs[start:end])
+		_, _ = GetExistingMangaUUIDs(testUUIDs[start:end])
 	}
 }
 
@@ -97,7 +97,10 @@ func TestGetExistingMangaUUIDs(t *testing.T) {
 	setupTestDB(t)
 
 	uuids := []string{"uuid-1", "uuid-2", "uuid-9999"}
-	existing := GetExistingMangaUUIDs(uuids)
+	existing, err := GetExistingMangaUUIDs(uuids)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if !existing["uuid-1"] {
 		t.Error("uuid-1 should exist")
@@ -117,13 +120,16 @@ func TestGetExistingMangaUUIDs_Chunking(t *testing.T) {
 	setupTestDB(t)
 
 	// setupTestDB adds 1000 UUIDs (uuid-0 to uuid-999)
-	// We pass 1100 UUIDs to test chunking (chunk size is 900)
+	// We pass 1100 UUIDs to test the json_each implementation
 	uuids := make([]string, 1100)
 	for i := 0; i < 1100; i++ {
 		uuids[i] = fmt.Sprintf("uuid-%d", i)
 	}
 
-	existing := GetExistingMangaUUIDs(uuids)
+	existing, err := GetExistingMangaUUIDs(uuids)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// uuid-0 to uuid-999 should exist (1000)
 	// uuid-1000 to uuid-1099 should not exist (100)

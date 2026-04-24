@@ -110,30 +110,37 @@ func ExistsInDatabase(uuid string) bool {
 	return rows.Next()
 }
 
-func GetExistingMangaUUIDs(uuids []string) map[string]bool {
+func GetExistingMangaUUIDs(uuids []string) (map[string]bool, error) {
 	if len(uuids) == 0 {
-		return make(map[string]bool)
+		return make(map[string]bool), nil
 	}
 
-	existing := make(map[string]bool)
+	existing := make(map[string]bool, len(uuids))
 
 	jsonUUIDs, err := json.Marshal(uuids)
-	internal.CheckErr(err)
+	if err != nil {
+		return nil, err
+	}
 
 	query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (SELECT value FROM json_each(?))", internal.TableManga)
 	rows, err := internal.DB.Query(query, string(jsonUUIDs))
-	internal.CheckErr(err)
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var uuid string
-		err := rows.Scan(&uuid)
-		internal.CheckErr(err)
+		if err := rows.Scan(&uuid); err != nil {
+			return nil, err
+		}
 		existing[uuid] = true
 	}
-	internal.CheckErr(rows.Err())
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-	return existing
+	return existing, nil
 }
 
 func UpsertManga(apiManga mangadex.Manga) {
