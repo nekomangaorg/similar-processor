@@ -78,3 +78,42 @@ func TestGetAllGenericFromTable_InvalidTable(t *testing.T) {
 		t.Errorf("expected error %q, got %q", expectedError, err.Error())
 	}
 }
+
+func TestDeleteSimilarDB(t *testing.T) {
+	db, teardown := setupTestDB(t)
+	defer teardown()
+
+	// Create SIMILAR table
+	_, err := db.Exec("CREATE TABLE " + internal.TableSimilar + " (UUID TEXT PRIMARY KEY, JSON TEXT)")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert test data
+	_, err = db.Exec("INSERT INTO " + internal.TableSimilar + " (UUID, JSON) VALUES (?, ?)", "uuid1", "{}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify data is there
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM " + internal.TableSimilar).Scan(&count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 row, got %d", count)
+	}
+
+	// Call DeleteSimilarDB
+	DeleteSimilarDB()
+
+	// Assert table is empty
+	err = db.QueryRow("SELECT COUNT(*) FROM " + internal.TableSimilar).Scan(&count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 rows after delete, got %d", count)
+	}
+}
