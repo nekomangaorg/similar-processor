@@ -110,48 +110,37 @@ func ExistsInDatabase(uuid string) bool {
 	return rows.Next()
 }
 
-func GetExistingMangaUUIDs(uuids []string) map[string]bool {
+func GetExistingMangaUUIDs(uuids []string) (map[string]bool, error) {
 	if len(uuids) == 0 {
-		return make(map[string]bool)
+		return make(map[string]bool), nil
 	}
 
-	existing := make(map[string]bool)
-	const chunkSize = 900 // SQLite's default parameter limit is 999, using a safe margin.
+	existing := make(map[string]bool, len(uuids))
 
-	for i := 0; i < len(uuids); i += chunkSize {
-		end := i + chunkSize
-		if end > len(uuids) {
-			end = len(uuids)
-		}
-		chunk := uuids[i:end]
-
-		if len(chunk) == 0 {
-			continue
-		}
-
-		placeholders := make([]string, len(chunk))
-		args := make([]any, len(chunk))
-		for j, uuid := range chunk {
-			placeholders[j] = "?"
-			args[j] = uuid
-		}
-
-		query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (%s)", internal.TableManga, strings.Join(placeholders, ","))
-		rows, err := internal.DB.Query(query, args...)
-		internal.CheckErr(err)
-
-		func() {
-			defer rows.Close()
-			for rows.Next() {
-				var uuid string
-				err := rows.Scan(&uuid)
-				internal.CheckErr(err)
-				existing[uuid] = true
-			}
-			internal.CheckErr(rows.Err())
-		}()
+	jsonUUIDs, err := json.Marshal(uuids)
+	if err != nil {
+		return nil, err
 	}
-	return existing
+
+	query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (SELECT value FROM json_each(?))", internal.TableManga)
+	rows, err := internal.DB.Query(query, string(jsonUUIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			return nil, err
+		}
+		existing[uuid] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return existing, nil
 }
 
 func UpsertManga(apiManga mangadex.Manga) {
