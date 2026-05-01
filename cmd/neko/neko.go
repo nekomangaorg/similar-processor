@@ -117,7 +117,7 @@ func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
 
 func getAllMappings(table string) map[string]string {
 	if !internal.IsValidMappingTable(table) {
-		fmt.Printf("getAllMappings: invalid table name %s\n", table)
+		fmt.Fprintf(os.Stderr, "getAllMappings: invalid table name %s\n", table)
 		return make(map[string]string)
 	}
 
@@ -131,7 +131,7 @@ func getAllMappings(table string) map[string]string {
 		if err := rows.Scan(&uuid, &id); err == nil {
 			mapping[uuid] = id
 		} else {
-			fmt.Printf("Warning: failed to scan row in table %s: %v\n", table, err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to scan row in table %s: %v\n", table, err)
 		}
 	}
 	internal.CheckErr(rows.Err())
