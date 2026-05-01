@@ -108,10 +108,12 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 var (
 	existsInDatabaseStmt *sql.Stmt
 	existsInDatabaseOnce sync.Once
+	existsInDatabaseErr  error
 )
 
 func resetExistsInDatabaseStmt() {
 	existsInDatabaseOnce = sync.Once{}
+	existsInDatabaseErr = nil
 	if existsInDatabaseStmt != nil {
 		existsInDatabaseStmt.Close()
 		existsInDatabaseStmt = nil
@@ -119,12 +121,11 @@ func resetExistsInDatabaseStmt() {
 }
 
 func ExistsInDatabase(uuid string) (bool, error) {
-	var initErr error
 	existsInDatabaseOnce.Do(func() {
-		existsInDatabaseStmt, initErr = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
+		existsInDatabaseStmt, existsInDatabaseErr = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
 	})
-	if initErr != nil {
-		return false, initErr
+	if existsInDatabaseErr != nil {
+		return false, existsInDatabaseErr
 	}
 
 	var exists int
