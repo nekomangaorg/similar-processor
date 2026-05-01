@@ -30,6 +30,7 @@ func setupTestDB(tb testing.TB) *sql.DB {
 	oldDB := internal.DB
 	internal.DB = db
 	tb.Cleanup(func() {
+		resetExistsInDatabaseStmt()
 		_ = db.Close()
 		internal.DB = oldDB
 	})

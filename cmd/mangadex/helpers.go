@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -103,11 +105,34 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 
 }
 
-func ExistsInDatabase(uuid string) bool {
-	rows, err := internal.DB.Query("SELECT 1 FROM "+internal.TableManga+" WHERE UUID= ?", uuid)
+var (
+	existsInDatabaseStmt *sql.Stmt
+	existsInDatabaseOnce sync.Once
+)
+
+func initExistsInDatabaseStmt() {
+	var err error
+	existsInDatabaseStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
 	internal.CheckErr(err)
-	defer rows.Close()
-	return rows.Next()
+}
+
+func resetExistsInDatabaseStmt() {
+	existsInDatabaseOnce = sync.Once{}
+	if existsInDatabaseStmt != nil {
+		existsInDatabaseStmt.Close()
+		existsInDatabaseStmt = nil
+	}
+}
+
+func ExistsInDatabase(uuid string) bool {
+	existsInDatabaseOnce.Do(initExistsInDatabaseStmt)
+	var exists int
+	err := existsInDatabaseStmt.QueryRow(uuid).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false
+	}
+	internal.CheckErr(err)
+	return true
 }
 
 func GetExistingMangaUUIDs(uuids []string) (map[string]bool, error) {
