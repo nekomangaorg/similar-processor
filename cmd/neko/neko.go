@@ -116,6 +116,11 @@ func setNekoField(nekoEntry *internal.DbNeko, table, value string) {
 }
 
 func getAllMappings(table string) map[string]string {
+	if !internal.IsValidMappingTable(table) {
+		fmt.Printf("getAllMappings: invalid table name %s\n", table)
+		return make(map[string]string)
+	}
+
 	rows, err := internal.DB.Query("SELECT UUID, ID FROM " + table)
 	internal.CheckErr(err)
 	defer rows.Close()

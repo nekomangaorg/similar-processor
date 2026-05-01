@@ -186,13 +186,13 @@ func syncMangaBakaFromSeries() {
 	fmt.Println("\nSyncing missing MangaBaka entries from remote SQLite API...")
 
 	fmt.Println("Loading mapping tables into memory...")
-	anilistMap := loadMappingIntoMap("ANILIST")
-	malMap := loadMappingIntoMap("MYANIMELIST")
-	kitsuMap := loadMappingIntoMap("KITSU")
-	animePlanetMap := loadMappingIntoMap("ANIME_PLANET")
-	muOldMap := loadMappingIntoMap("MANGAUPDATES_OLD")
-	muNewMap := loadMappingIntoMap("MANGAUPDATES_NEW")
-	mangaBakaMap := loadMappingIntoMap("MANGABAKA")
+	anilistMap := loadMappingIntoMap(internal.TableAnilist)
+	malMap := loadMappingIntoMap(internal.TableMyanimelist)
+	kitsuMap := loadMappingIntoMap(internal.TableKitsu)
+	animePlanetMap := loadMappingIntoMap(internal.TableAnimePlanet)
+	muOldMap := loadMappingIntoMap(internal.TableMangaupdates)
+	muNewMap := loadMappingIntoMap(internal.TableMangaupdatesNewId)
+	mangaBakaMap := loadMappingIntoMap(internal.TableMangaBaka)
 
 	downloadUrl := "https://api.mangabaka.dev/v1/database/series.sqlite.tar.gz"
 	fmt.Printf("Downloading and extracting %s...\n", downloadUrl)
@@ -345,6 +345,11 @@ func syncMangaBakaFromSeries() {
 
 func loadMappingIntoMap(tableName string) map[string]string {
 	m := make(map[string]string)
+
+	if !internal.IsValidMappingTable(tableName) {
+		fmt.Printf("loadMappingIntoMap: invalid table name %s\n", tableName)
+		return m
+	}
 
 	query := fmt.Sprintf("SELECT ID, UUID FROM %s", tableName)
 	rows, err := internal.DB.Query(query)

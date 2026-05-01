@@ -99,3 +99,13 @@ func GetMangaCount() (int, error) {
 	}
 	return count, nil
 }
+
+// IsValidMappingTable returns true if the table name is a valid mapping table.
+// This is used to prevent SQL injection when table names are used in queries.
+func IsValidMappingTable(table string) bool {
+	switch table {
+	case TableAnilist, TableAnimePlanet, TableBookWalker, TableKitsu, TableMyanimelist, TableMangaupdates, TableMangaupdatesNewId, TableNovelUpdates, TableMangaBaka:
+		return true
+	}
+	return false
+}
