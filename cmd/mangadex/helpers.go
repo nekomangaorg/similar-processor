@@ -110,12 +110,6 @@ var (
 	existsInDatabaseOnce sync.Once
 )
 
-func initExistsInDatabaseStmt() {
-	var err error
-	existsInDatabaseStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
-	internal.CheckErr(err)
-}
-
 func resetExistsInDatabaseStmt() {
 	existsInDatabaseOnce = sync.Once{}
 	if existsInDatabaseStmt != nil {
@@ -124,15 +118,24 @@ func resetExistsInDatabaseStmt() {
 	}
 }
 
-func ExistsInDatabase(uuid string) bool {
-	existsInDatabaseOnce.Do(initExistsInDatabaseStmt)
+func ExistsInDatabase(uuid string) (bool, error) {
+	var initErr error
+	existsInDatabaseOnce.Do(func() {
+		existsInDatabaseStmt, initErr = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
+	})
+	if initErr != nil {
+		return false, initErr
+	}
+
 	var exists int
 	err := existsInDatabaseStmt.QueryRow(uuid).Scan(&exists)
 	if err == sql.ErrNoRows {
-		return false
+		return false, nil
 	}
-	internal.CheckErr(err)
-	return true
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func GetExistingMangaUUIDs(uuids []string) (map[string]bool, error) {

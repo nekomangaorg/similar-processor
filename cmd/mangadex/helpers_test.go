@@ -61,7 +61,7 @@ func BenchmarkExistsInDatabase(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ExistsInDatabase(testUUIDs[i%1000])
+		_, _ = ExistsInDatabase(testUUIDs[i%1000])
 	}
 }
 
@@ -84,12 +84,20 @@ func TestExistsInDatabase(t *testing.T) {
 	setupTestDB(t)
 
 	// Test existing
-	if !ExistsInDatabase("uuid-1") {
+	exists, err := ExistsInDatabase("uuid-1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !exists {
 		t.Error("uuid-1 should exist")
 	}
 
 	// Test non-existing
-	if ExistsInDatabase("uuid-9999") {
+	exists, err = ExistsInDatabase("uuid-9999")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exists {
 		t.Error("uuid-9999 should not exist")
 	}
 }
