@@ -107,29 +107,38 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 
 var (
 	existsInDatabaseStmt *sql.Stmt
-	existsInDatabaseOnce sync.Once
-	existsInDatabaseErr  error
+	existsInDatabaseMu   sync.RWMutex
 )
 
 func resetExistsInDatabaseStmt() {
-	existsInDatabaseOnce = sync.Once{}
-	existsInDatabaseErr = nil
+	existsInDatabaseMu.Lock()
+	defer existsInDatabaseMu.Unlock()
 	if existsInDatabaseStmt != nil {
-		existsInDatabaseStmt.Close()
+		_ = existsInDatabaseStmt.Close()
 		existsInDatabaseStmt = nil
 	}
 }
 
 func ExistsInDatabase(uuid string) (bool, error) {
-	existsInDatabaseOnce.Do(func() {
-		existsInDatabaseStmt, existsInDatabaseErr = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
-	})
-	if existsInDatabaseErr != nil {
-		return false, existsInDatabaseErr
+	existsInDatabaseMu.RLock()
+	stmt := existsInDatabaseStmt
+	existsInDatabaseMu.RUnlock()
+
+	if stmt == nil {
+		existsInDatabaseMu.Lock()
+		var err error
+		if existsInDatabaseStmt == nil {
+			existsInDatabaseStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
+		}
+		stmt = existsInDatabaseStmt
+		existsInDatabaseMu.Unlock()
+		if err != nil {
+			return false, err
+		}
 	}
 
 	var exists int
-	err := existsInDatabaseStmt.QueryRow(uuid).Scan(&exists)
+	err := stmt.QueryRow(uuid).Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
