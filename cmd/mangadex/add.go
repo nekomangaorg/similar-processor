@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/antihax/optional"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/similar-manga/similar/internal"
 	"github.com/similar-manga/similar/mangadex"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"

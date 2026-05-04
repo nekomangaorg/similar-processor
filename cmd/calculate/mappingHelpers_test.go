@@ -149,6 +149,7 @@ func TestCheckAndAddLegacyId(t *testing.T) {
 			},
 			expectedResult: false,
 			verify: func(t *testing.T) {
+				CloseDebugFiles()
 				debugFile := filepath.Join("debug", "BadMUIds.txt")
 				t.Cleanup(func() { _ = os.Remove(debugFile) })
 
