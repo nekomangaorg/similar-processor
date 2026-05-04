@@ -102,7 +102,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 			fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id...\n", index+1, total, uuid, idOriginal)
 			upsertNewMuId(uuid, convertedId)
-
+			return true
 		} else {
 			if err1 != nil {
 				fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to get legacy id %s: %v\u001B[0m\n", uuid, convertedId, err1)
