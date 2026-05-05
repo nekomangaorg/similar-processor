@@ -43,6 +43,9 @@ func upsertNewMuId(uuid string, id string) {
 }
 
 func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) error {
+	if !internal.IsValidMappingTable(table) {
+		return fmt.Errorf("UpsertGeneric: invalid table name %s", table)
+	}
 	_, err := tx.Exec("INSERT INTO "+table+" (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
 	return err
 }
