@@ -8,7 +8,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 func BenchmarkInsertSimilarData(b *testing.B) {

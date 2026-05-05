@@ -8,10 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/similar-manga/similar/internal"
-	"github.com/similar-manga/similar/mangadex"
-	"go.uber.org/ratelimit"
 	"iter"
 	"log"
 	"net/http"
@@ -19,6 +15,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/nekomangaorg/similar-processor/internal"
+	"github.com/nekomangaorg/similar-processor/mangadex"
+	"go.uber.org/ratelimit"
 )
 
 func ApiMangaToJson(apiManga mangadex.Manga) []byte {

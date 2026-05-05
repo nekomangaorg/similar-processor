@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/similar-manga/similar/internal"
 	"iter"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 func DeleteSimilarDB() error {

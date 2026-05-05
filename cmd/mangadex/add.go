@@ -3,13 +3,14 @@ package mangadex
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/antihax/optional"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/similar-manga/similar/internal"
-	"github.com/similar-manga/similar/mangadex"
+	"github.com/nekomangaorg/similar-processor/internal"
+	"github.com/nekomangaorg/similar-processor/mangadex"
 	"github.com/spf13/cobra"
 	"go.uber.org/ratelimit"
-	"time"
 )
 
 // addCmd represents the new command

@@ -3,7 +3,7 @@ package similar_helpers
 import (
 	"testing"
 
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 func TestNotValidMatch(t *testing.T) {

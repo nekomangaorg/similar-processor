@@ -3,9 +3,6 @@ package calculate
 import (
 	"database/sql"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/similar-manga/similar/internal"
-	"go.uber.org/ratelimit"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/nekomangaorg/similar-processor/internal"
+	"go.uber.org/ratelimit"
 )
 
 var httpClient = &http.Client{

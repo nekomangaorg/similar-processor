@@ -1,7 +1,7 @@
 package calculate
 
 import (
-	"github.com/similar-manga/similar/cmd"
+	"github.com/nekomangaorg/similar-processor/cmd"
 	"github.com/spf13/cobra"
 )
 

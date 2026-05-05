@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/similar-manga/similar/internal"
-	md "github.com/similar-manga/similar/mangadex"
+	"github.com/nekomangaorg/similar-processor/internal"
+	md "github.com/nekomangaorg/similar-processor/mangadex"
 )
 
 var testUUIDs []string

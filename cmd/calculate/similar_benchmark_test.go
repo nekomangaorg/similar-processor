@@ -2,9 +2,10 @@ package calculate
 
 import (
 	"fmt"
-	"github.com/similar-manga/similar/internal"
 	"iter"
 	"testing"
+
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 // Helper to create a large manga list

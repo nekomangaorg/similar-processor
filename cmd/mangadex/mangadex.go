@@ -1,9 +1,10 @@
 package mangadex
 
 import (
-	"github.com/similar-manga/similar/cmd"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/nekomangaorg/similar-processor/cmd"
+	"github.com/spf13/cobra"
 )
 
 var mangadexCmd = &cobra.Command{

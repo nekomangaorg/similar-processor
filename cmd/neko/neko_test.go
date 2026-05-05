@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 func TestProcessMangaList(t *testing.T) {

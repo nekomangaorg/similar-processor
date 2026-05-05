@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/internal"
 	"go.uber.org/ratelimit"
 )
 

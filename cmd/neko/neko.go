@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/similar-manga/similar/cmd"
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/cmd"
+	"github.com/nekomangaorg/similar-processor/internal"
 	"github.com/spf13/cobra"
 )
 

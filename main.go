@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/similar-manga/similar/cmd"
-	_ "github.com/similar-manga/similar/cmd/calculate"
-	_ "github.com/similar-manga/similar/cmd/init"
-	_ "github.com/similar-manga/similar/cmd/mangadex"
-	_ "github.com/similar-manga/similar/cmd/neko"
+	"github.com/nekomangaorg/similar-processor/cmd"
+	_ "github.com/nekomangaorg/similar-processor/cmd/calculate"
+	_ "github.com/nekomangaorg/similar-processor/cmd/init"
+	_ "github.com/nekomangaorg/similar-processor/cmd/mangadex"
+	_ "github.com/nekomangaorg/similar-processor/cmd/neko"
 )
 
 func main() {

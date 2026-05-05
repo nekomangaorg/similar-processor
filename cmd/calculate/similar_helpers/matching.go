@@ -1,7 +1,7 @@
 package similar_helpers
 
 import (
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 var oneWayTags = []string{

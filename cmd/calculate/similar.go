@@ -17,8 +17,8 @@ import (
 	"github.com/james-bowman/nlp"
 	"github.com/james-bowman/sparse"
 	_ "github.com/mattn/go-sqlite3"
-	similar "github.com/similar-manga/similar/cmd/calculate/similar_helpers"
-	"github.com/similar-manga/similar/internal"
+	similar "github.com/nekomangaorg/similar-processor/cmd/calculate/similar_helpers"
+	"github.com/nekomangaorg/similar-processor/internal"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/gonum/mat"
 )

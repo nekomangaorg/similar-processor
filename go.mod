@@ -1,4 +1,4 @@
-module github.com/similar-manga/similar
+module github.com/nekomangaorg/similar-processor
 
 go 1.23.0
 

@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"github.com/similar-manga/similar/internal"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/nekomangaorg/similar-processor/internal"
+	"github.com/spf13/cobra"
 )
 
 // RootCmd represents the base command when called without any subcommands

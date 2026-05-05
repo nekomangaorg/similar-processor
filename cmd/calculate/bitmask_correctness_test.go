@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/similar-manga/similar/internal"
+	"github.com/nekomangaorg/similar-processor/internal"
 )
 
 // Helper to mimic the old logic exactly
