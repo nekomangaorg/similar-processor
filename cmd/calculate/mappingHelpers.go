@@ -22,7 +22,7 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
-var legacyIdRegex = regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
+var legacyIdRegex = regexp.MustCompile(`\d+`)
 
 const muUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
 
@@ -116,6 +116,10 @@ func AddAlreadyConvertedId(ctx context.Context, index int, total int, uuid strin
 		idEncoded := int64(internal.Decode(muLink))
 		base10Id := strconv.FormatInt(idEncoded, 10)
 
+		if exists, _ := muEntryExistsInNewIDDatabase(uuid); exists {
+			return true
+		}
+
 		// Try the new id!
 		rateLimiter.Take()
 		resp2, err := muGet(ctx, "https://api.mangaupdates.com/v1/series/"+url.PathEscape(base10Id))
@@ -148,6 +152,10 @@ func CheckAndAddLegacyId(ctx context.Context, index int, total int, uuid string,
 	idOriginal, err := strconv.Atoi(ints[0])
 	if err == nil {
 		convertedId := strconv.Itoa(idOriginal)
+
+		if exists, _ := muEntryExistsInNewIDDatabase(uuid); exists {
+			return true
+		}
 
 		rateLimiter.Take()
 		// Try the existing as the id (not likely since mangadex won't have updated..)

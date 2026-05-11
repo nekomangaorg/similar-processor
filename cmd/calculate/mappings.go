@@ -155,7 +155,12 @@ func calculateMangaUpdatesNewIdMapping(ctx context.Context, mangaList iter.Seq[i
 	guard := make(chan struct{}, maxGoroutines)
 
 	for index, data := range muLinks {
-		if exists, _ := muEntryExistsInNewIDDatabase(data.uuid); exists {
+		exists, err := muEntryExistsInNewIDDatabase(data.uuid)
+		if err != nil {
+			fmt.Printf("failed to check if entry exists for %s: %v\n", data.uuid, err)
+			continue
+		}
+		if exists {
 			continue
 		}
 
