@@ -31,14 +31,19 @@ func TestMatchMinHeap(t *testing.T) {
 	}
 
 	// Test Pop order (Min-Heap: smallest distance first)
-	expectedDistances := []float64{0.1, 0.3, 0.5, 0.8}
-	for _, expected := range expectedDistances {
+	expected := []customMatch{
+		{ID: 2, Distance: 0.1},
+		{ID: 4, Distance: 0.3},
+		{ID: 1, Distance: 0.5},
+		{ID: 3, Distance: 0.8},
+	}
+	for _, exp := range expected {
 		if h.Len() == 0 {
 			t.Fatal("Heap unexpectedly empty")
 		}
 		m := heap.Pop(h).(customMatch)
-		if m.Distance != expected {
-			t.Errorf("Expected distance %f, got %f", expected, m.Distance)
+		if m.ID != exp.ID || m.Distance != exp.Distance {
+			t.Errorf("Expected %+v, got %+v", exp, m)
 		}
 	}
 
