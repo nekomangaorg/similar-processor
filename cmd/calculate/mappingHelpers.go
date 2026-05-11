@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -14,16 +15,38 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/nekomangaorg/similar-processor/internal"
 	"go.uber.org/ratelimit"
+	"sync"
 )
 
 var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
+var legacyIdRegex = regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
+
 const muUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
 
-func muGet(url string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
+var (
+	muEntryExistsStmt *sql.Stmt
+	upsertMuStmt      *sql.Stmt
+	mappingStmtMu     sync.RWMutex
+)
+
+func resetMappingStmts() {
+	mappingStmtMu.Lock()
+	defer mappingStmtMu.Unlock()
+	if muEntryExistsStmt != nil {
+		_ = muEntryExistsStmt.Close()
+		muEntryExistsStmt = nil
+	}
+	if upsertMuStmt != nil {
+		_ = upsertMuStmt.Close()
+		upsertMuStmt = nil
+	}
+}
+
+func muGet(ctx context.Context, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -31,16 +54,52 @@ func muGet(url string) (*http.Response, error) {
 	return httpClient.Do(req)
 }
 
-func muEntryExistsInNewIDDatabase(uuid string) bool {
-	rows, err := internal.DB.Query("SELECT UUID FROM "+internal.TableMangaupdatesNewId+" WHERE UUID= ?", uuid)
-	internal.CheckErr(err)
-	defer rows.Close()
-	return rows.Next()
+func muEntryExistsInNewIDDatabase(uuid string) (bool, error) {
+	mappingStmtMu.RLock()
+	stmt := muEntryExistsStmt
+	mappingStmtMu.RUnlock()
+
+	if stmt == nil {
+		mappingStmtMu.Lock()
+		var err error
+		if muEntryExistsStmt == nil {
+			muEntryExistsStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableMangaupdatesNewId + " WHERE UUID= ?")
+		}
+		stmt = muEntryExistsStmt
+		mappingStmtMu.Unlock()
+		if err != nil {
+			return false, err
+		}
+	}
+
+	var exists int
+	err := stmt.QueryRow(uuid).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
 }
 
-func upsertNewMuId(uuid string, id string) {
-	_, err := internal.DB.Exec("INSERT INTO "+internal.TableMangaupdatesNewId+" (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID", uuid, id)
-	internal.CheckErr(err)
+func upsertNewMuId(uuid string, id string) error {
+	mappingStmtMu.RLock()
+	stmt := upsertMuStmt
+	mappingStmtMu.RUnlock()
+
+	if stmt == nil {
+		mappingStmtMu.Lock()
+		var err error
+		if upsertMuStmt == nil {
+			upsertMuStmt, err = internal.DB.Prepare("INSERT INTO " + internal.TableMangaupdatesNewId + " (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID")
+		}
+		stmt = upsertMuStmt
+		mappingStmtMu.Unlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err := stmt.Exec(uuid, id)
+	return err
 }
 
 func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) error {
@@ -51,19 +110,15 @@ func UpsertGeneric(tx *sql.Tx, table string, uuid string, id string) error {
 	return err
 }
 
-func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
+func AddAlreadyConvertedId(ctx context.Context, index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
 	if len(muLink) == 7 {
 		// Encode from base36 format
 		idEncoded := int64(internal.Decode(muLink))
 		base10Id := strconv.FormatInt(idEncoded, 10)
 
-		if muEntryExistsInNewIDDatabase(uuid) {
-			return true
-		}
-
 		// Try the new id!
 		rateLimiter.Take()
-		resp2, err := muGet("https://api.mangaupdates.com/v1/series/" + url.PathEscape(base10Id))
+		resp2, err := muGet(ctx, "https://api.mangaupdates.com/v1/series/"+url.PathEscape(base10Id))
 		if err != nil {
 			fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to get new id %s: %v\u001B[0m\n", uuid, base10Id, err)
 			return false
@@ -73,19 +128,20 @@ func AddAlreadyConvertedId(index int, total int, uuid string, muLink string, rat
 		// Save if good!
 		if resp2.StatusCode == 200 {
 			fmt.Printf("%d/%d manga %s -> mu id %s encoded into %s -> is new MU id!\n", index+1, total, uuid, muLink, base10Id)
-			upsertNewMuId(uuid, base10Id)
+			if err := upsertNewMuId(uuid, base10Id); err != nil {
+				fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to save new id %s: %v\u001B[0m\n", uuid, base10Id, err)
+			}
 			return true
 		}
 	}
 	return false
 }
 
-func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
+func CheckAndAddLegacyId(ctx context.Context, index int, total int, uuid string, muLink string, rateLimiter ratelimit.Limiter) bool {
 	// For our ID conversion
 	// https://www.unitconverters.net/numbers/base-36-to-decimal.htm
-	re := regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
 
-	ints := re.FindAllString(muLink, -1)
+	ints := legacyIdRegex.FindAllString(muLink, -1)
 	if len(ints) < 1 {
 		return false
 	}
@@ -93,19 +149,17 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 	if err == nil {
 		convertedId := strconv.Itoa(idOriginal)
 
-		if muEntryExistsInNewIDDatabase(uuid) {
-			return true
-		}
-
 		rateLimiter.Take()
 		// Try the existing as the id (not likely since mangadex won't have updated..)
-		resp1, err1 := muGet("https://api.mangaupdates.com/v1/series/" + url.PathEscape(convertedId))
+		resp1, err1 := muGet(ctx, "https://api.mangaupdates.com/v1/series/"+url.PathEscape(convertedId))
 
 		if err1 == nil && resp1.StatusCode == 200 {
 			drainAndClose(resp1)
 
 			fmt.Printf("%d/%d manga %s -> mu id of %d -> is old MU id...\n", index+1, total, uuid, idOriginal)
-			upsertNewMuId(uuid, convertedId)
+			if err := upsertNewMuId(uuid, convertedId); err != nil {
+				fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to save legacy id %s: %v\u001B[0m\n", uuid, convertedId, err)
+			}
 			return true
 		} else {
 			if err1 != nil {
@@ -123,7 +177,7 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 				// If invalid, then try to get the page and parse it!
 				// Query and get our html... (no api to get this...)
 				muUrl := "https://www.mangaupdates.com/series.html?id=" + url.QueryEscape(convertedId)
-				resp, err := muGet(muUrl)
+				resp, err := muGet(ctx, muUrl)
 
 				// Sleep if we get a warning, otherwise we don't retry again!
 				if err == nil && resp.StatusCode == 429 {
@@ -131,7 +185,11 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 					drainAndClose(resp)
 
-					time.Sleep(2.0 * time.Second)
+					select {
+					case <-time.After(2 * time.Second):
+					case <-ctx.Done():
+						return false
+					}
 				} else if err == nil && resp.StatusCode != 200 {
 					if resp.StatusCode == 503 {
 						//this is a bad id on Dex's side write to debug file
@@ -145,7 +203,11 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 
 						drainAndClose(resp)
 
-						time.Sleep(2.0 * time.Second)
+						select {
+						case <-time.After(2 * time.Second):
+						case <-ctx.Done():
+							return false
+						}
 					}
 
 				} else if err == nil && resp.StatusCode == 200 {
@@ -164,7 +226,9 @@ func CheckAndAddLegacyId(index int, total int, uuid string, muLink string, rateL
 					if len(paths) > 3 {
 						rssId := paths[len(paths)-2]
 						fmt.Printf("%d/%d manga %s -> mu id of %d | RSS URL IS %s | %s id found\n", index+1, total, uuid, idOriginal, rssUrl, rssId)
-						upsertNewMuId(uuid, convertedId)
+						if err := upsertNewMuId(uuid, convertedId); err != nil {
+							fmt.Printf("\u001B[1;31m %s EXTERNAL MU: failed to save scraped id %s: %v\u001B[0m\n", uuid, convertedId, err)
+						}
 						return true
 					}
 				} else {
