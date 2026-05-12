@@ -2,6 +2,7 @@ package calculate
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -24,6 +25,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 func setupTestDBWithTable(t *testing.T) func() {
 	t.Helper()
 	_, teardown := setupTestDB(t)
+	resetMappingStmts()
 
 	// Ensure the table exists
 	_, err := internal.DB.Exec("CREATE TABLE IF NOT EXISTS " + internal.TableMangaupdatesNewId + " (UUID TEXT PRIMARY KEY, ID TEXT)")
@@ -179,7 +181,7 @@ func TestCheckAndAddLegacyId(t *testing.T) {
 				},
 			}
 
-			result := CheckAndAddLegacyId(0, 1, tt.uuid, tt.muLink, ratelimit.NewUnlimited())
+			result := CheckAndAddLegacyId(context.Background(), 0, 1, tt.uuid, tt.muLink, ratelimit.NewUnlimited())
 
 			if result != tt.expectedResult {
 				t.Errorf("expected result %v, got %v", tt.expectedResult, result)
@@ -229,7 +231,7 @@ func TestCheckAndAddLegacyId_Retry429(t *testing.T) {
 		},
 	}
 
-	result := CheckAndAddLegacyId(0, 1, "uuid_retry", "https://www.mangaupdates.com/series.html?id=99999", ratelimit.NewUnlimited())
+	result := CheckAndAddLegacyId(context.Background(), 0, 1, "uuid_retry", "https://www.mangaupdates.com/series.html?id=99999", ratelimit.NewUnlimited())
 
 	if !result {
 		t.Errorf("expected success after retry")
