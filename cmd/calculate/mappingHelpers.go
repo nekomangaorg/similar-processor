@@ -30,6 +30,8 @@ var (
 	muEntryExistsStmt *sql.Stmt
 	upsertMuStmt      *sql.Stmt
 	mappingStmtMu     sync.RWMutex
+	muEntryExistsOnce sync.Once
+	upsertMuOnce      sync.Once
 )
 
 func resetMappingStmts() {
@@ -43,6 +45,8 @@ func resetMappingStmts() {
 		_ = upsertMuStmt.Close()
 		upsertMuStmt = nil
 	}
+	muEntryExistsOnce = sync.Once{}
+	upsertMuOnce = sync.Once{}
 }
 
 func muGet(ctx context.Context, url string) (*http.Response, error) {
@@ -55,21 +59,22 @@ func muGet(ctx context.Context, url string) (*http.Response, error) {
 }
 
 func muEntryExistsInNewIDDatabase(uuid string) (bool, error) {
+	muEntryExistsOnce.Do(func() {
+		mappingStmtMu.Lock()
+		defer mappingStmtMu.Unlock()
+		var err error
+		muEntryExistsStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableMangaupdatesNewId + " WHERE UUID= ?")
+		if err != nil {
+			fmt.Printf("ERROR: failed to prepare muEntryExistsInNewIDDatabase statement: %v\n", err)
+		}
+	})
+
 	mappingStmtMu.RLock()
 	stmt := muEntryExistsStmt
 	mappingStmtMu.RUnlock()
 
 	if stmt == nil {
-		mappingStmtMu.Lock()
-		var err error
-		if muEntryExistsStmt == nil {
-			muEntryExistsStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableMangaupdatesNewId + " WHERE UUID= ?")
-		}
-		stmt = muEntryExistsStmt
-		mappingStmtMu.Unlock()
-		if err != nil {
-			return false, err
-		}
+		return false, fmt.Errorf("muEntryExistsInNewIDDatabase: statement not initialized")
 	}
 
 	var exists int
@@ -81,21 +86,22 @@ func muEntryExistsInNewIDDatabase(uuid string) (bool, error) {
 }
 
 func upsertNewMuId(uuid string, id string) error {
+	upsertMuOnce.Do(func() {
+		mappingStmtMu.Lock()
+		defer mappingStmtMu.Unlock()
+		var err error
+		upsertMuStmt, err = internal.DB.Prepare("INSERT INTO " + internal.TableMangaupdatesNewId + " (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID")
+		if err != nil {
+			fmt.Printf("ERROR: failed to prepare upsertNewMuId statement: %v\n", err)
+		}
+	})
+
 	mappingStmtMu.RLock()
 	stmt := upsertMuStmt
 	mappingStmtMu.RUnlock()
 
 	if stmt == nil {
-		mappingStmtMu.Lock()
-		var err error
-		if upsertMuStmt == nil {
-			upsertMuStmt, err = internal.DB.Prepare("INSERT INTO " + internal.TableMangaupdatesNewId + " (UUID, ID) VALUES (?, ?) ON CONFLICT (UUID) DO UPDATE SET ID=excluded.ID")
-		}
-		stmt = upsertMuStmt
-		mappingStmtMu.Unlock()
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("upsertNewMuId: statement not initialized")
 	}
 
 	_, err := stmt.Exec(uuid, id)
@@ -115,10 +121,6 @@ func AddAlreadyConvertedId(ctx context.Context, index int, total int, uuid strin
 		// Encode from base36 format
 		idEncoded := int64(internal.Decode(muLink))
 		base10Id := strconv.FormatInt(idEncoded, 10)
-
-		if exists, _ := muEntryExistsInNewIDDatabase(uuid); exists {
-			return true
-		}
 
 		// Try the new id!
 		rateLimiter.Take()
@@ -152,10 +154,6 @@ func CheckAndAddLegacyId(ctx context.Context, index int, total int, uuid string,
 	idOriginal, err := strconv.Atoi(ints[0])
 	if err == nil {
 		convertedId := strconv.Itoa(idOriginal)
-
-		if exists, _ := muEntryExistsInNewIDDatabase(uuid); exists {
-			return true
-		}
 
 		rateLimiter.Take()
 		// Try the existing as the id (not likely since mangadex won't have updated..)

@@ -3,6 +3,7 @@ package internal
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"iter"
 	"log"
 )
@@ -108,4 +109,52 @@ func IsValidMappingTable(table string) bool {
 		return true
 	}
 	return false
+}
+
+// GetExistingUUIDs returns a map of UUIDs that exist in the specified table.
+// It uses SQLite's json_each for efficient bulk lookup.
+func GetExistingUUIDs(table string, uuids []string) (map[string]bool, error) {
+	if len(uuids) == 0 {
+		return make(map[string]bool), nil
+	}
+
+	// Validate table name to prevent SQL injection
+	isValid := IsValidMappingTable(table)
+	if !isValid {
+		switch table {
+		case TableManga, TableSimilar:
+			isValid = true
+		}
+	}
+
+	if !isValid {
+		return nil, fmt.Errorf("GetExistingUUIDs: invalid table name %s", table)
+	}
+
+	existing := make(map[string]bool, len(uuids))
+
+	jsonUUIDs, err := json.Marshal(uuids)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (SELECT value FROM json_each(?))", table)
+	rows, err := DB.Query(query, string(jsonUUIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			return nil, err
+		}
+		existing[uuid] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return existing, nil
 }
