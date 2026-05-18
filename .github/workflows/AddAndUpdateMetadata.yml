@@ -23,7 +23,7 @@ jobs:
         run: go get .
 
       - name: Build
-        run: go build -v
+        run: go build -v -o similar
 
       - name: Setup DB
         run: ./similar init
