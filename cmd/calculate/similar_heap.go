@@ -7,10 +7,10 @@ type customMatch struct {
 
 type MatchMinHeap []customMatch
 
-func (h MatchMinHeap) Len() int            { return len(h) }
-func (h MatchMinHeap) Less(i, j int) bool  { return h[i].Distance < h[j].Distance }
-func (h MatchMinHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
-func (h *MatchMinHeap) Push(x any) { *h = append(*h, x.(customMatch)) }
+func (h MatchMinHeap) Len() int           { return len(h) }
+func (h MatchMinHeap) Less(i, j int) bool { return h[i].Distance < h[j].Distance }
+func (h MatchMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *MatchMinHeap) Push(x any)        { *h = append(*h, x.(customMatch)) }
 func (h *MatchMinHeap) Pop() any {
 	old := *h
 	n := len(old)
