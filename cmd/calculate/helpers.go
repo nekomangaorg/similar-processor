@@ -52,6 +52,61 @@ func InsertSimilarData(similarData internal.SimilarManga) {
 	internal.CheckErr(err)
 }
 
+func BatchInsertSimilarData(results <-chan internal.SimilarManga) error {
+	const batchSize = 1000
+	batch := make([]internal.SimilarManga, 0, batchSize)
+
+	flushBatch := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		tx, err := internal.DB.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		stmt, err := tx.Prepare("INSERT INTO " + internal.TableSimilar + " (UUID, JSON) VALUES (?, ?)")
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		for _, similarData := range batch {
+			jsonSimilar, err := json.Marshal(similarData)
+			if err != nil {
+				return err
+			}
+
+			_, err = stmt.Exec(similarData.Id, jsonSimilar)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+
+		batch = batch[:0]
+		return nil
+	}
+
+	for simData := range results {
+		batch = append(batch, simData)
+		if len(batch) >= batchSize {
+			if err := flushBatch(); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Flush any remaining items in the batch
+	return flushBatch()
+}
+
 // getDBSimilar streams similar manga entries from the database using an iterator.
 // Overclock optimization: Previously, this loaded the entire 'SIMILAR' table into memory
 // as a slice before returning, causing an O(n) memory spike and large GC pressure on large datasets.
