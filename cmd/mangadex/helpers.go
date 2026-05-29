@@ -109,6 +109,7 @@ func SearchMangaDex(rateLimiter ratelimit.Limiter, client *mangadex.APIClient, c
 var (
 	existsInDatabaseStmt *sql.Stmt
 	existsInDatabaseMu   sync.RWMutex
+	existsInDatabaseOnce sync.Once
 )
 
 func resetExistsInDatabaseStmt() {
@@ -118,24 +119,26 @@ func resetExistsInDatabaseStmt() {
 		_ = existsInDatabaseStmt.Close()
 		existsInDatabaseStmt = nil
 	}
+	existsInDatabaseOnce = sync.Once{}
 }
 
 func ExistsInDatabase(uuid string) (bool, error) {
+	existsInDatabaseOnce.Do(func() {
+		existsInDatabaseMu.Lock()
+		defer existsInDatabaseMu.Unlock()
+		var err error
+		existsInDatabaseStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
+		if err != nil {
+			log.Printf("ERROR: failed to prepare ExistsInDatabase statement: %v", err)
+		}
+	})
+
 	existsInDatabaseMu.RLock()
 	stmt := existsInDatabaseStmt
 	existsInDatabaseMu.RUnlock()
 
 	if stmt == nil {
-		existsInDatabaseMu.Lock()
-		var err error
-		if existsInDatabaseStmt == nil {
-			existsInDatabaseStmt, err = internal.DB.Prepare("SELECT 1 FROM " + internal.TableManga + " WHERE UUID= ?")
-		}
-		stmt = existsInDatabaseStmt
-		existsInDatabaseMu.Unlock()
-		if err != nil {
-			return false, err
-		}
+		return false, fmt.Errorf("ExistsInDatabase: statement not initialized")
 	}
 
 	var exists int
@@ -150,36 +153,7 @@ func ExistsInDatabase(uuid string) (bool, error) {
 }
 
 func GetExistingMangaUUIDs(uuids []string) (map[string]bool, error) {
-	if len(uuids) == 0 {
-		return make(map[string]bool), nil
-	}
-
-	existing := make(map[string]bool, len(uuids))
-
-	jsonUUIDs, err := json.Marshal(uuids)
-	if err != nil {
-		return nil, err
-	}
-
-	query := fmt.Sprintf("SELECT UUID FROM %s WHERE UUID IN (SELECT value FROM json_each(?))", internal.TableManga)
-	rows, err := internal.DB.Query(query, string(jsonUUIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var uuid string
-		if err := rows.Scan(&uuid); err != nil {
-			return nil, err
-		}
-		existing[uuid] = true
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return existing, nil
+	return internal.GetExistingUUIDs(internal.TableManga, uuids)
 }
 
 func UpsertManga(apiManga mangadex.Manga) {

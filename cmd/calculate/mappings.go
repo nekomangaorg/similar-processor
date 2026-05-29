@@ -148,6 +148,17 @@ func calculateMangaUpdatesNewIdMapping(ctx context.Context, mangaList iter.Seq[i
 		}
 	}
 
+	// Pre-filter UUIDs that already exist in the new mapping table to avoid N+1 queries
+	muUUIDs := make([]string, len(muLinks))
+	for i, data := range muLinks {
+		muUUIDs[i] = data.uuid
+	}
+	existingMuUUIDs, err := internal.GetExistingUUIDs(internal.TableMangaupdatesNewId, muUUIDs)
+	if err != nil {
+		fmt.Printf("failed to bulk check existing MU entries: %v\n", err)
+		existingMuUUIDs = make(map[string]bool)
+	}
+
 	// Loop through all manga and try to get their chapter information for each
 	start := time.Now()
 	var wg sync.WaitGroup
@@ -155,12 +166,7 @@ func calculateMangaUpdatesNewIdMapping(ctx context.Context, mangaList iter.Seq[i
 	guard := make(chan struct{}, maxGoroutines)
 
 	for index, data := range muLinks {
-		exists, err := muEntryExistsInNewIDDatabase(data.uuid)
-		if err != nil {
-			fmt.Printf("failed to check if entry exists for %s: %v\n", data.uuid, err)
-			continue
-		}
-		if exists {
+		if existingMuUUIDs[data.uuid] {
 			continue
 		}
 
