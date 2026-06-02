@@ -34,6 +34,19 @@ var apostropheReplacer = strings.NewReplacer(
 
 var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 
+var tagReplacer *strings.Replacer
+
+func init() {
+	var replacerArgs []string
+	for _, tag := range EnglishDescriptionTags {
+		replacerArgs = append(replacerArgs, tag, "")
+	}
+	for _, tag := range BBCodes {
+		replacerArgs = append(replacerArgs, tag, "")
+	}
+	tagReplacer = strings.NewReplacer(replacerArgs...)
+}
+
 func fastCleanTitle(strRaw string) string {
 	var b strings.Builder
 	b.Grow(len(strRaw))
@@ -219,15 +232,8 @@ func CleanDescription(strRaw string) string {
 	// Replace new lines with space and standard lexicons
 	strRaw = apostropheReplacer.Replace(strRaw)
 
-	// Now remove all english tags which are no longer needed
-	for _, tag := range EnglishDescriptionTags {
-		strRaw = strings.ReplaceAll(strRaw, tag, "")
-	}
-
-	// Next clean the string from any bbcodes
-	for _, tag := range BBCodes {
-		strRaw = strings.ReplaceAll(strRaw, tag, "")
-	}
+	// Remove all english tags and bbcodes which are no longer needed
+	strRaw = tagReplacer.Replace(strRaw)
 
 	strRaw = filterTextTags(strRaw)
 
