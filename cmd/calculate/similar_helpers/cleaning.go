@@ -34,9 +34,7 @@ var apostropheReplacer = strings.NewReplacer(
 
 var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 
-var tagReplacer *strings.Replacer
-
-func init() {
+var tagReplacer = strings.NewReplacer(func() []string {
 	replacerArgs := make([]string, 0, (len(EnglishDescriptionTags)+len(BBCodes))*2)
 	for _, tag := range EnglishDescriptionTags {
 		replacerArgs = append(replacerArgs, strings.ToLower(tag), "")
@@ -44,8 +42,8 @@ func init() {
 	for _, tag := range BBCodes {
 		replacerArgs = append(replacerArgs, strings.ToLower(tag), "")
 	}
-	tagReplacer = strings.NewReplacer(replacerArgs...)
-}
+	return replacerArgs
+}()...)
 
 func fastCleanTitle(strRaw string) string {
 	var b strings.Builder
