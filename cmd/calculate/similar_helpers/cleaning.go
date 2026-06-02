@@ -37,12 +37,12 @@ var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), 
 var tagReplacer *strings.Replacer
 
 func init() {
-	var replacerArgs []string
+	replacerArgs := make([]string, 0, (len(EnglishDescriptionTags)+len(BBCodes))*2)
 	for _, tag := range EnglishDescriptionTags {
-		replacerArgs = append(replacerArgs, tag, "")
+		replacerArgs = append(replacerArgs, strings.ToLower(tag), "")
 	}
 	for _, tag := range BBCodes {
-		replacerArgs = append(replacerArgs, tag, "")
+		replacerArgs = append(replacerArgs, strings.ToLower(tag), "")
 	}
 	tagReplacer = strings.NewReplacer(replacerArgs...)
 }
