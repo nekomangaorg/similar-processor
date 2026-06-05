@@ -194,7 +194,7 @@ func syncMangaBakaFromSeries() {
 	muNewMap := loadMappingIntoMap(internal.TableMangaupdatesNewId)
 	mangaBakaMap := loadMappingIntoMap(internal.TableMangaBaka)
 
-	downloadUrl := "https://api.mangabaka.dev/v1/database/series.sqlite.tar.gz"
+	downloadUrl := "https://api.mangabaka.org/v1/database/series.sqlite.tar.gz"
 	fmt.Printf("Downloading and extracting %s...\n", downloadUrl)
 	resp, err := http.Get(downloadUrl)
 	internal.CheckErr(err)
