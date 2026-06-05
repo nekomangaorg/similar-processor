@@ -3,6 +3,7 @@ package calculate
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -113,7 +114,7 @@ func runMappings(cmd *cobra.Command, args []string) {
 
 	totalManga, err := internal.GetMangaCount()
 	internal.CheckErr(err)
-	calculateMangaUpdatesNewIdMapping(internal.StreamAllManga(), totalManga)
+	calculateMangaUpdatesNewIdMapping(cmd.Context(), internal.StreamAllManga(), totalManga)
 
 	syncMangaBakaFromSeries()
 
@@ -121,7 +122,7 @@ func runMappings(cmd *cobra.Command, args []string) {
 
 }
 
-func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], totalManga int) {
+func calculateMangaUpdatesNewIdMapping(ctx context.Context, mangaList iter.Seq[internal.Manga], totalManga int) {
 	fmt.Println("Calculating MangaUpdates New Id Mapping")
 	rateLimiter := ratelimit.New(1)
 
@@ -154,6 +155,15 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 	guard := make(chan struct{}, maxGoroutines)
 
 	for index, data := range muLinks {
+		exists, err := muEntryExistsInNewIDDatabase(data.uuid)
+		if err != nil {
+			fmt.Printf("failed to check if entry exists for %s: %v\n", data.uuid, err)
+			continue
+		}
+		if exists {
+			continue
+		}
+
 		// would block if guard channel is already filled
 		guard <- struct{}{}
 
@@ -166,7 +176,7 @@ func calculateMangaUpdatesNewIdMapping(mangaList iter.Seq[internal.Manga], total
 			}()
 			// Our search file
 			defer wg.Done()
-			if !AddAlreadyConvertedId(index, totalManga, uuid, muLink, rateLimiter) && !CheckAndAddLegacyId(index, totalManga, uuid, muLink, rateLimiter) {
+			if !AddAlreadyConvertedId(ctx, index, totalManga, uuid, muLink, limiter) && !CheckAndAddLegacyId(ctx, index, totalManga, uuid, muLink, limiter) {
 				fmt.Printf("%d/%d manga %s -> mu invalid %s\n", index+1, totalManga, uuid, muLink)
 			}
 			<-guard

@@ -377,6 +377,7 @@ func runConcurrentProcessing(data *SimilarityData, config processingConfig) {
 	mangaCount := len(data.MangaList)
 	jobs := make(chan int, mangaCount)
 	progressChan := make(chan struct{}, mangaCount)
+	resultChan := make(chan internal.SimilarManga, 1000)
 	var wg sync.WaitGroup
 
 	for w := 0; w < config.threads; w++ {
@@ -384,7 +385,7 @@ func runConcurrentProcessing(data *SimilarityData, config processingConfig) {
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				processManga(idx, data, config, progressChan)
+				processManga(idx, data, config, progressChan, resultChan)
 			}
 		}()
 	}
@@ -407,15 +408,25 @@ func runConcurrentProcessing(data *SimilarityData, config processingConfig) {
 		fmt.Println()
 	}()
 
+	// Start database worker
+	var dbWg sync.WaitGroup
+	dbWg.Add(1)
+	go func() {
+		defer dbWg.Done()
+		BatchInsertSimilarData(resultChan)
+	}()
+
 	for i := 0; i < mangaCount; i++ {
 		jobs <- i
 	}
 	close(jobs)
 	wg.Wait()
 	close(progressChan)
+	close(resultChan)
+	dbWg.Wait()
 }
 
-func processManga(idx int, data *SimilarityData, config processingConfig, progress chan<- struct{}) {
+func processManga(idx int, data *SimilarityData, config processingConfig, progress chan<- struct{}, resultChan chan<- internal.SimilarManga) {
 	defer func() { progress <- struct{}{} }()
 
 	current := data.MangaList[idx]
@@ -520,7 +531,7 @@ func processManga(idx int, data *SimilarityData, config processingConfig, progre
 	}
 
 	if !config.debugMode {
-		InsertSimilarData(simData)
+		resultChan <- simData
 	}
 }
 
@@ -552,25 +563,6 @@ func invalidForProcessing(match customMatch, currentIdx int, current, target int
 		return true, "Tag Check"
 	}
 	return false, ""
-}
-
-type customMatch struct {
-	ID                                  int
-	Distance, DistanceTag, DistanceDesc float64
-}
-
-type MatchMinHeap []customMatch
-
-func (h MatchMinHeap) Len() int            { return len(h) }
-func (h MatchMinHeap) Less(i, j int) bool  { return h[i].Distance < h[j].Distance }
-func (h MatchMinHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
-func (h *MatchMinHeap) Push(x interface{}) { *h = append(*h, x.(customMatch)) }
-func (h *MatchMinHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
 }
 
 func exportSimilar() {
