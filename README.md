@@ -91,6 +91,12 @@ running `./similar` will give you a list of commands.
 <td>Store as id</td>
 </tr>
 <tr>
+<td>mb</td>
+<td>mangabaka</td>
+<td><a href="https://mangabaka.org/series/%60%7Bid%7D%60">https://mangabaka.org/series/`{id}`</a></td>
+<td>Stored as id</td>
+</tr>
+<tr>
 <td>raw</td>
 <td>N/A</td>
 <td>N/A</td>
