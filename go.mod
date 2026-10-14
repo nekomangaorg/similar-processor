@@ -1,8 +1,6 @@
 module github.com/nekomangaorg/similar-processor
 
-go 1.23.0
-
-toolchain go1.24.3
+go 1.25.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
@@ -13,7 +11,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/spf13/cobra v1.7.0
 	go.uber.org/ratelimit v0.3.0
-	golang.org/x/text v0.23.0
+	golang.org/x/text v0.37.0
 	gonum.org/v1/gonum v0.11.0
 )
 
@@ -25,5 +23,5 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 )
